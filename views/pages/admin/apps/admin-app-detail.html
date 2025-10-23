@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Detail Aplikasi - Admin SSO</title>
+    <style>
+      /* Menggunakan style yang sama dengan form edit */
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        background-color: #f8f9fa;
+      }
+      .header {
+        background-color: #343a40;
+        color: white;
+        padding: 15px 30px;
+      }
+      .container {
+        padding: 30px;
+      }
+      .detail-container {
+        background-color: white;
+        padding: 30px;
+        border-radius: 8px;
+        max-width: 700px;
+        margin: auto;
+      }
+      .detail-item {
+        margin-bottom: 15px;
+        padding-bottom: 15px;
+        border-bottom: 1px solid #eee;
+      }
+      .detail-item label {
+        font-weight: bold;
+        color: #555;
+        display: block;
+      }
+      .detail-item p {
+        margin: 5px 0 0;
+        font-size: 1.1em;
+      }
+      .btn {
+        text-decoration: none;
+        padding: 10px 18px;
+        border-radius: 5px;
+        color: white;
+      }
+      .btn-secondary {
+        background-color: #6c757d;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+        <h2><a href="/admin/dashboard" style="color:white; text-decoration: none;">Admin SSO Portal</a></h2>
+    </div>
+    <div class="container">
+      <div class="detail-container">
+        <h3>Detail Aplikasi</h3>
+        <hr />
+        <div class="detail-item">
+          <label>Nama Aplikasi</label>
+          <p>{{.App.Name}}</p>
+        </div>
+        <div class="detail-item">
+          <label>Slug</label>
+          <p><code>{{.App.Slug}}</code></p>
+        </div>
+        <div class="detail-item">
+          <label>Target URL</label>
+          <p>{{.App.TargetURL}}</p>
+        </div>
+        <div class="detail-item">
+          <label>Dapat Diakses oleh Peran</label>
+          <p>
+            {{range $i, $role := .RoleNames}} {{if $i}}, {{end}}<span
+              style="text-transform: capitalize"
+              >{{$role}}</span
+            >
+            {{else}}
+            <em>Tidak ada peran yang memiliki akses.</em>
+            {{end}}
+          </p>
+        </div>
+        <a
+          href="/admin/applications"
+          class="btn btn-secondary"
+          style="margin-top: 20px"
+          >Kembali ke Daftar</a
+        >
+      </div>
+    </div>
+  </body>
+</html>

@@ -1,0 +1,4 @@
+# File: .gitignore
+
+# Abaikan file environment yang berisi rahasia
+.env

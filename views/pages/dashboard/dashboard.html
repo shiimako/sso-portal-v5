@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dashboard - Portal SSO</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        background-color: #f8f9fa;
+      }
+      .header {
+        background-color: white;
+        padding: 10px 30px;
+        border-bottom: 1px solid #dee2e6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .header h2 {
+        margin: 0;
+      }
+      .header-info {
+        text-align: right;
+      }
+      .logout-btn {
+        text-decoration: none;
+        padding: 8px 12px;
+        background-color: #dc3545;
+        color: white;
+        border-radius: 5px;
+        font-size: 14px;
+      }
+      .container {
+        padding: 30px;
+      }
+      .app-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 20px;
+        margin-top: 20px;
+      }
+      .app-card {
+        background-color: white;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 20px;
+        width: 220px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+      .app-card h4 {
+        margin-top: 0;
+      }
+      .app-card a {
+        text-decoration: none;
+        padding: 8px 12px;
+        background-color: #28a745;
+        color: white;
+        border-radius: 5px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+        <div>
+            <h2>Portal SSO</h2>
+        </div>
+        <div class="header-info">
+            <span>{{.UserName}} (Aktif: {{.ActiveRole}})</span> |
+            <a href="/select-role">Ganti Peran</a> |
+            <a href="/logout" class="logout-btn">Logout</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <h3>Aplikasi yang Tersedia (Peran: {{.ActiveRole}})</h3>
+        <hr />
+
+        {{if eq .ActiveRole "admin"}}
+        <div style="margin-bottom: 15px">
+          <a href="/admin/dashboard" style="text-decoration: none; padding: 8px 12px; background: #007bff; color: white; border-radius: 5px;">
+            Buka Dashboard Admin
+          </a>
+        </div>
+        {{end}}
+
+        <div class="app-grid">
+            {{/* Correctly range over the SLICE sent with the key "AppsByRole" */}}
+            {{range .AppsByRole}}
+                <div class="app-card">
+                    <h4>{{.Name}}</h4>
+                    <p>Klik untuk mengakses sistem {{.Name}}.</p>
+                    <a href="/redirect?app={{.Slug}}">Masuk</a>
+                </div>
+            {{else}}
+                {{/* This else is executed if the .AppsByRole slice is empty */}}
+                <p>Tidak ada aplikasi yang tersedia untuk peran Anda saat ini.</p>
+            {{end}} {{/* End of the range block */}}
+        </div> {{/* End of app-grid div */}}
+    </div> {{/* End of container div */}}
+</body>
+</html>

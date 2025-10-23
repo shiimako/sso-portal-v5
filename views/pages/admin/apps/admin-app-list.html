@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manajemen Aplikasi - Admin SSO</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f8f9fa; }
+        .header { background-color: #343a40; color: white; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; }
+        .header h2 { margin: 0; }
+        .logout-btn { text-decoration: none; padding: 8px 12px; background-color: #dc3545; color: white; border-radius: 5px; font-size: 14px; }
+        .container { padding: 30px; }
+        .table { width: 100%; border-collapse: collapse; background-color: white; }
+        .table th, .table td { border: 1px solid #dee2e6; padding: 12px; text-align: left; }
+        .table th { background-color: #e9ecef; }
+        .btn { text-decoration: none; padding: 6px 10px; border-radius: 5px; color: white; }
+        .btn-edit { background-color: #ffc107; }
+        .btn-delete { background-color: #dc3545; }
+        .btn-add { background-color: #007bff; display: inline-block; margin-bottom: 20px; }
+        .btn-info { background-color: #17a2b8; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2><a href="/admin/dashboard" style="color:white; text-decoration: none;">Admin SSO Portal</a></h2>
+        <a href="/admin/dashboard" class="logout-btn">Kembali</a>
+    </div>
+
+    <div class="container">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <h3>Manajemen Aplikasi</h3>
+            <a href="/admin/applications/new" class="btn btn-add">Tambah Aplikasi Baru</a>
+        </div>
+        <hr>
+        
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nama Aplikasi</th>
+                    <th>Slug</th>
+                    <th>Target URL</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{range .Applications}}
+                <tr>
+                    <td>{{.ID}}</td>
+                    <td>{{.Name}}</td>
+                    <td>{{.Slug}}</td>
+                    <td>{{.TargetURL}}</td>
+                    <td>
+                        <a href="/admin/applications/detail/{{.ID}}" class="btn btn-info">Detail</a>
+                        <a href="/admin/applications/edit/{{.ID}}" class="btn btn-edit">Edit</a>
+                        <form action="/admin/applications/delete/{{.ID}}" method="POST" style="display:inline;" onsubmit="return confirm('Anda yakin?');">
+                            <button type="submit" class="btn btn-delete" style="cursor: pointer;">Hapus</button>
+                        </form>
+                    </td>
+                </tr>
+                {{end}}
+            </tbody>
+        </table>
+    </div>
+</body>
+</html>

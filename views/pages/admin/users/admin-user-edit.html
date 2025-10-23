@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8" />
+    <title>Edit Pengguna - Admin SSO</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background-color: #f8f9fa; }
+        .header { background-color: #343a40; color: white; padding: 15px 30px; }
+        .container { padding: 30px; max-width: 800px; margin: auto; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { font-weight: bold; display: block; margin-bottom: 5px; }
+        .form-group input, .form-group select { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        .checkbox-group { display: flex; gap: 20px; flex-wrap: wrap; }
+        .checkbox-group label { font-weight: normal; }
+        .btn { padding: 12px 20px; border-radius: 5px; border: none; cursor: pointer; color: #fff; text-decoration: none; }
+        .btn-primary { background-color: #007bff; }
+        .btn-secondary { background-color: #6c757d; }
+        .card { background-color: white; padding: 25px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 25px; }
+        .card h4 { margin-top: 0; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px; }
+        .attribute-item { margin-bottom: 15px; padding: 10px; border: 1px solid #eee; border-radius: 5px; }
+        .attribute-row { display: flex; align-items: center; gap: 15px; }
+        .attribute-checkbox { min-width: 200px; }
+        .attribute-scope { flex: 1; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2><a href="/admin/dashboard" style="color:white; text-decoration: none;">Admin SSO Portal</a></h2>
+    </div>
+
+    <div class="container">
+        <h3>Edit Pengguna: {{.User.Name}}</h3>
+
+        <form action="/admin/users/update/{{.User.ID}}" method="POST">
+
+            <div class="card">
+                <h4>Informasi Utama & Peran Dasar</h4>
+                <div class="form-group">
+                    <label for="name">Nama Lengkap</label>
+                    <input type="text" name="name" value="{{.User.Name}}" required />
+                </div>
+                <div class="form-group">
+                    <label for="email">Email</label>
+                    <input type="email" name="email" value="{{.User.Email}}" required />
+                </div>
+                <div class="form-group">
+                    <label for="status">Status</label>
+                    <select name="status" required>
+                        <option value="aktif" {{if eq .User.Status "aktif"}}selected{{end}}>Aktif</option>
+                        <option value="cuti" {{if eq .User.Status "cuti"}}selected{{end}}>Cuti</option>
+                        <option value="dropout" {{if eq .User.Status "dropout"}}selected{{end}}>Dropout</option>
+                        <option value="lulus" {{if eq .User.Status "lulus"}}selected{{end}}>Lulus</option>
+                        <option value="resign" {{if eq .User.Status "resign"}}selected{{end}}>Resign</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Peran Dasar</label>
+                    <div class="checkbox-group">
+                        {{range .BaseRoles}}
+                          <label>
+                            <input type="checkbox" name="role_ids" value="{{.ID}}" id="role_{{.ID}}"
+                              {{if (contains $.User.RolesStr (printf ",%d," .ID))}}checked{{end}} onchange="toggleRoleFields()">
+                            {{.Name}}
+                          </label>
+                        {{end}}
+                    </div>
+                </div>
+
+                 <!-- Field Mahasiswa (NIM) -->
+                 <div id="mahasiswa_fields" style="display: none;">
+                   <div class="form-group">
+                     <label for="nim">NIM (Mahasiswa)</label>
+                     <input type="text" name="nim" id="nim_field" value="{{.User.NIM.String}}" />
+                   </div>
+                 </div>
+
+                 <!-- Field Dosen (NIP & NIDN) -->
+                 <div id="dosen_fields" style="display: none;">
+                   <div class="form-group">
+                     <label for="nip">NIP (Dosen)</label>
+                     <input type="text" name="nip" id="nip_field" value="{{.User.NIP.String}}" />
+                   </div>
+                   <div class="form-group">
+                     <label for="nidn">NIDN (Dosen)</label>
+                     <input type="text" name="nidn" id="nidn_field" value="{{.User.NIDN.String}}" />
+                   </div>
+                 </div>
+            </div>
+
+            <div class="card">
+                <h4>Atribut / Jabatan Tambahan</h4>
+                <div class="form-group">
+                    {{if .AllAttributes}}
+                        {{range .AllAttributes}}
+                            <div class="attribute-item">
+                                <div class="attribute-row">
+                                    <label class="attribute-checkbox">
+                                        <input type="checkbox" name="attribute_ids" value="{{.ID}}"
+                                        {{if (index $.User.Attributes .ID)}}checked{{end}}>
+                                        {{.Name}}
+                                    </label>
+                                    <input type="text" class="attribute-scope" name="scope_{{.ID}}" 
+                                           value="{{if (index $.User.Attributes .ID)}}{{index $.User.Attributes .ID}}{{end}}" 
+                                           placeholder="Konteks/Scope (mis: Teknik Informatika)">
+                                </div>
+                            </div>
+                        {{end}}
+                    {{else}}
+                        <p style="color: #666; font-style: italic;">Tidak ada atribut tambahan yang tersedia</p>
+                    {{end}}
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Update Pengguna</button>
+            <a href="/admin/users" class="btn btn-secondary">Batal</a>
+        </form>
+    </div>
+
+    <script>
+        function toggleRoleFields() {
+            // Cek status checkbox
+            const isMahasiswa = document.getElementById('role_3')?.checked || false;
+            const isDosen = document.getElementById('role_2')?.checked || false;
+
+            // Tampilkan/sembunyikan field mahasiswa
+            const mahasiswaFields = document.getElementById('mahasiswa_fields');
+            if (mahasiswaFields) {
+                mahasiswaFields.style.display = isMahasiswa ? 'block' : 'none';
+                // Kosongkan field jika tidak dicentang
+                if (!isMahasiswa) {
+                    document.getElementById('nim_field').value = '';
+                }
+            }
+
+            // Tampilkan/sembunyikan field dosen
+            const dosenFields = document.getElementById('dosen_fields');
+            if (dosenFields) {
+                dosenFields.style.display = isDosen ? 'block' : 'none';
+                // Kosongkan field jika tidak dicentang
+                if (!isDosen) {
+                    document.getElementById('nip_field').value = '';
+                    document.getElementById('nidn_field').value = '';
+                }
+            }
+        }
+
+        // Set kondisi awal saat halaman dimuat
+        document.addEventListener('DOMContentLoaded', function() {
+            toggleRoleFields();
+        });
+    </script>
+
+</body>
+</html>

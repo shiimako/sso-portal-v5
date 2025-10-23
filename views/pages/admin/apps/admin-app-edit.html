@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Edit Aplikasi - Admin SSO</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        margin: 0;
+        background: #f8f9fa;
+      }
+      .container {
+        padding: 30px;
+        max-width: 700px;
+        margin: auto;
+      }
+      .form-group {
+        margin-bottom: 20px;
+      }
+      .form-group label {
+        font-weight: bold;
+        display: block;
+        margin-bottom: 5px;
+      }
+      .form-group input,
+      .form-group select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+      }
+      .checkbox-group {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .btn {
+        padding: 12px 20px;
+        border-radius: 5px;
+        border: none;
+        cursor: pointer;
+        color: #fff;
+      }
+      .btn-primary {
+        background: #007bff;
+      }
+      .btn-danger {
+        background: #dc3545;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">...</div>
+    <div class="container">
+      <div class="form-container">
+        <h3>Edit Aplikasi: {{.App.Name}}</h3>
+        <hr />
+        <form action="/admin/applications/update/{{.App.ID}}" method="POST">
+          <div class="form-group">
+            <label for="name">Nama Aplikasi</label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value="{{.App.Name}}"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label for="slug">Slug</label>
+            <input
+              type="text"
+              id="slug"
+              name="slug"
+              value="{{.App.Slug}}"
+              required
+              pattern="[a-z0-9-]+"
+            />
+          </div>
+          <div class="form-group">
+            <label for="target_url">Target URL</label>
+            <input
+              type="url"
+              id="target_url"
+              name="target_url"
+              value="{{.App.TargetURL}}"
+              required
+            />
+          </div>
+          <div class="form-group">
+            <label>Hak Akses Peran</label>
+            <div class="checkbox-group">
+              {{range .AllRoles}}
+              <label>
+                <input
+                  type="checkbox"
+                  name="role_ids"
+                  value="{{.ID}}"
+                  {{if
+                  (index
+                  $.CurrentRoles
+                  .ID)}}checked{{end}}
+                />
+                {{.Name}} ({{.Type}})
+              </label>
+              {{end}}
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Update Aplikasi</button>
+        </form>
+      </div>
+    </div>
+  </body>
+</html>
