@@ -3,6 +3,7 @@ package views
 
 import (
 	"html/template"
+	"log"
 	"strings"
 )
 
@@ -31,7 +32,13 @@ func InitTemplates() (*template.Template, error) {
 		"views/pages/*/*/*.html",
 	}
 	for _, pattern := range patterns {
-		tmpl.ParseGlob(pattern)
+		_, err := tmpl.ParseGlob(pattern)
+		if err != nil {
+			// Jika ada 1 file saja yang gagal di-parse,
+			// hentikan aplikasi dan beri tahu file mana yang error.
+			log.Printf("ERROR: Gagal parsing template pattern '%s': %v", pattern, err)
+			return nil, err
+		}
 	}
 
 	// (Opsional) partials/components

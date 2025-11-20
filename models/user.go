@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"strings"
 
 	"github.com/jmoiron/sqlx"
@@ -10,29 +11,34 @@ import (
 
 // UserWithRoles adalah struct untuk menampilkan daftar pengguna di tabel admin.
 type UserWithRoles struct {
-	ID     int
-	Name   string
-	Email  string
-	Status string
-	Roles  string
+	ID     int `db:"id"`
+	Name   string `db:"name"`
+	Email  string `db:"email"`
+	Status string `db:"status"`
+	Roles  string `db:"roles"`
 }
 
 // User adalah struct untuk data user lengkap.
 type User struct {
-	ID         int
-	Name       string
-	Email      string
-	Status     string
-	Roles      []int          // Slice of role IDs
-	RolesStr   string         // Comma-separated role IDs for easier checking in templates
-	Attributes map[int]string // Map of attribute role IDs for checkbox checking
+	ID         int  `db:"id"`
+	Name       string `db:"name"`
+	Email      string `db:"email"`
+	Status     string `db:"status"`
+	Avatar 		sql.NullString `db:"avatar"`
 
-	NIM  sql.NullString
-	NIP  sql.NullString
-	NIDN sql.NullString
+	Roles      []int          
+	RolesStr   string         
+	Attributes map[int]string 
 
-	Address sql.NullString
-	Phone   sql.NullString
+	Student_ID sql.NullInt64  `db:"student_id"`
+	NIM  sql.NullString `db:"nim"`
+
+	Lecturer_ID sql.NullInt64  `db:"lecturer_id"`
+	NIP  sql.NullString `db:"nip"`
+	NIDN sql.NullString `db:"nidn"`
+
+	Address sql.NullString `db:"address"`
+	Phone   sql.NullString `db:"phone_number"`
 }
 
 // Attribute adalah struct untuk data atribut.
@@ -53,21 +59,9 @@ func GetAllUsers(db *sqlx.DB) ([]UserWithRoles, error) {
         GROUP BY u.id
         ORDER BY u.id ASC`
 
-	rows, err := db.Query(query)
+	err := db.Select(&users, query)
 	if err != nil {
-		return nil, err // Kembalikan error jika query gagal
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var user UserWithRoles
-		var roles sql.NullString
-		if err := rows.Scan(&user.ID, &user.Name, &user.Email, &user.Status, &roles); err != nil {
-			// Jika ada error saat scan, lanjutkan ke baris berikutnya
-			continue
-		}
-		user.Roles = roles.String
-		users = append(users, user)
+		return nil, err
 	}
 
 	return users, nil
@@ -100,47 +94,57 @@ func GetAllRoles(db *sqlx.DB) ([]Role, error) {
 // FindUserByID sekarang hanya fokus mengambil data satu user.
 func FindUserByID(db *sqlx.DB, id string) (User, error) {
 	var user User
-	err := db.Get(&user, `SELECT id, name, email, status FROM users WHERE id=?`, id)
+	err := db.Get(&user, `SELECT id, name, email, status, avatar FROM users WHERE id=?`, id)
 	if err != nil {
 		return user, err
 	}
 
-	type UserRoleLink struct {
-		RoleID   int            `db:"id"`
-		RoleType string         `db:"type"`
-		Scope    sql.NullString `db:"scope"` // Gunakan NullString untuk scan
-	}
-	var assignedRoles []UserRoleLink
-	err = db.Select(&assignedRoles, `SELECT r.id, r.type, ur.scope FROM roles r JOIN user_roles ur ON r.id = ur.role_id WHERE ur.user_id = ?`, id)
-	if err != nil && err != sql.ErrNoRows {
+	roles, err := GetUserRolesAndAttributes(db, user.ID)
+	if err != nil {
 		return user, err
 	}
 
+	// 3. Proses peran dan cari tahu apakah dia dosen atau mahasiswa
 	var hasStudentRole, hasLecturerRole bool
 	user.Attributes = make(map[int]string)
 	var sb strings.Builder
 	sb.WriteString(",")
 
-	for _, r := range assignedRoles {
-		if r.RoleType == "base" {
-			user.Roles = append(user.Roles, r.RoleID)
-			sb.WriteString(fmt.Sprintf("%d,", r.RoleID))
-			if r.RoleID == 2 {
+	for _, r := range roles {
+		// Asumsi 'base' roles punya ID 2 (dosen) dan 3 (mahasiswa)
+		if r.Type == "base" {
+			roleID := 0 // Cari ID berdasarkan nama r.Name jika perlu
+			if r.Name == "dosen" { 
+				roleID = 2 // Ganti hardcode jika perlu
 				hasLecturerRole = true
 			}
-			if r.RoleID == 3 {
+			if r.Name == "mahasiswa" { 
+				roleID = 3 // Ganti hardcode jika perlu
 				hasStudentRole = true
 			}
-		} else if r.RoleType == "attribute" {
-			user.Attributes[r.RoleID] = r.Scope.String // [FIX] Gunakan .String
+			
+			if roleID != 0 {
+				user.Roles = append(user.Roles, roleID)
+				sb.WriteString(fmt.Sprintf("%d,", roleID))
+			}
 		}
 	}
 	user.RolesStr = sb.String()
 
+
+	// 4. Ambil data profil (NIM/NIP/Alamat) berdasarkan perannya
 	if hasStudentRole {
-		_ = db.QueryRow(`SELECT nim, address, phone_number FROM students WHERE user_id=?`, id).Scan(&user.NIM, &user.Address, &user.Phone)
+		// Ambil data mahasiswa
+		err = db.QueryRowx(`SELECT id AS student_id, nim, address, phone_number FROM students WHERE user_id=?`, id).StructScan(&user)
+		if err != nil && err != sql.ErrNoRows {
+			log.Printf("Warning: Gagal ambil detail mahasiswa: %v", err)
+		}
 	} else if hasLecturerRole {
-		_ = db.QueryRow(`SELECT nip, nidn, address, phone_number FROM lecturers WHERE user_id=?`, id).Scan(&user.NIP, &user.NIDN, &user.Address, &user.Phone)
+		// Ambil data dosen
+		err = db.QueryRowx(`SELECT id as lecturer_id, nip, nidn, address, phone_number FROM lecturers WHERE user_id=?`, id).StructScan(&user)
+		if err != nil && err != sql.ErrNoRows {
+			log.Printf("Warning: Gagal ambil detail dosen: %v", err)
+		}
 	}
 
 	return user, nil
@@ -292,4 +296,45 @@ func contains(list []string, val string) bool {
 		}
 	}
 	return false
+}
+
+// UpdateUserAvatar HANYA mengupdate avatar
+func UpdateUserAvatar(db *sqlx.DB, userID int, avatarURL string) error {
+	_, err := db.Exec(`UPDATE users SET avatar = ? WHERE id = ?`, avatarURL, userID)
+	return err
+}
+
+// UpdateUserProfile mengupdate data yang bisa diubah oleh user sendiri
+func UpdateUserProfile(db *sqlx.DB, userID int, name, address, phone, avatarPath string) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	// 1. Update tabel users
+	if avatarPath != "" {
+		// Jika ada avatar baru, update nama DAN avatar
+		_, err = tx.Exec(`UPDATE users SET name = ?, avatar = ? WHERE id = ?`, name, avatarPath, userID)
+	} else {
+		// Jika tidak ada avatar baru, HANYA update nama
+		_, err = tx.Exec(`UPDATE users SET name = ? WHERE id = ?`, name, userID)
+	}
+	if err != nil {
+		return err
+	}
+
+	// 2. Update tabel students ATAU lecturers (asumsi user_id unik)
+	// Coba update lecturers dulu
+	res, err := tx.Exec(`UPDATE lecturers SET address = ?, phone_number = ? WHERE user_id = ?`, address, phone, userID)
+	if err != nil { return err }
+	
+	rowsAffected, _ := res.RowsAffected()
+	if rowsAffected == 0 {
+		// Jika tidak ada baris di lecturers yg ter-update, coba update students
+		_, err = tx.Exec(`UPDATE students SET address = ?, phone_number = ? WHERE user_id = ?`, address, phone, userID)
+		if err != nil { return err }
+	}
+
+	return tx.Commit()
 }

@@ -6,10 +6,12 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"sso-portal-v3/handlers"
+	"sso-portal-v3/models"
 	"strings"
 )
 
@@ -41,7 +43,6 @@ func (ac *AuthController) ShowLoginPage(w http.ResponseWriter, r *http.Request) 
 	data := map[string]interface{}{
 		"FlashMessages": flashes,
 	}
-
 
 	err := ac.env.Templates.ExecuteTemplate(w, "login.html", data)
 	if err != nil {
@@ -122,8 +123,6 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 	}
 
 	adminEmail := os.Getenv("ADMIN_EMAIL_OVERRIDE")
-
-	// Filter 1 : email harus domain @pnc.ac.id
 	if !userProfile.VerifiedEmail || !strings.HasSuffix(userProfile.Email, "@pnc.ac.id") && userProfile.Email != adminEmail {
 		session.AddFlash("Hanya email dengan domain @pnc.ac.id yang diizinkan.")
 		session.Save(r, w)
@@ -132,13 +131,11 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Filter 2 : email harus sudah terdaftar di tabel users
 	var userID int
 	var userStatus string
 	var userName string
 	var allRoles []UserRole
 
-	// Query untuk mengambil data user dan semua perannya sekaligus
 	query := `SELECT u.id, u.name, u.status, r.name, r.type, ur.scope FROM users u 
 	           JOIN user_roles ur ON u.id = ur.user_id 
 	           JOIN roles r ON ur.role_id = r.id 
@@ -163,7 +160,6 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 		allRoles = append(allRoles, role)
 	}
 
-	// Filetr 3 : cek apakah user ditemukan dan statusnya aktif
 	if userID == 0 {
 		session.AddFlash("Email Anda belum terdaftar di sistem.")
 		session.Save(r, w)
@@ -180,48 +176,43 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	user, err := models.FindUserByID(ac.env.DB, fmt.Sprintf("%d", userID))
+	if err != nil {
+		// Handle error (meskipun kecil kemungkinannya karena kita baru cek email)
+		http.Error(w, "Gagal mengambil detail user", http.StatusInternalServerError)
+		return
+	}
+
+	if !user.Avatar.Valid && userProfile.Picture != "" {
+		log.Printf("INFO: Avatar untuk user %d kosong, mengisi dari Google...", user.ID)
+		err = models.UpdateUserAvatar(ac.env.DB, user.ID, userProfile.Picture)
+		if err != nil {
+			// Bukan error fatal, cukup log saja
+			log.Printf("WARNING: Gagal update avatar untuk user %d: %v", user.ID, err)
+		}
+	}
+
 	var baseRoles []string
-	var attributes []map[string]interface{}
 
-	    for _, role := range allRoles {
-        if role.Type == "base" {
-            baseRoles = append(baseRoles, role.Name)
-        } else if role.Type == "attribute" {
-            attr := map[string]interface{}{"role": role.Name}
-            // Cek jika scope tidak NULL sebelum menambahkannya
-            if role.Scope.Valid { 
-                attr["scope"] = role.Scope.String
-            }
-            attributes = append(attributes, attr)
-        }
-    }
+	for _, role := range allRoles {
+		if role.Type == "base" {
+			baseRoles = append(baseRoles, role.Name)
+		} 
+	}
 
-	// Simpan informasi user di session
 	session.Values["authenticated"] = true
 	session.Values["user_id"] = userID
-	session.Values["user_name"] = userName
-	session.Values["email"] = userProfile.Email
-	session.Values["attributes"] = attributes
 	session.Values["avatar"] = userProfile.Picture
-	delete(session.Values, "state") // Hapus state karena sudah tidak diperlukan lagi
+	delete(session.Values, "state")
 
-
-	// Logika pemilihan peran
-	if len(baseRoles) == 1 {
-		// Jika hanya punya 1 peran, langsung set dan arahkan ke dashboard
-		session.Values["active_role"] = baseRoles[0]
-		session.Save(r, w)
-		http.Redirect(w, r, "/dashboard", http.StatusFound)
-	} else if len(baseRoles) > 1 {
-		// Jika punya banyak peran, simpan daftarnya dan arahkan ke halaman pemilihan
-		session.Values["available_roles"] = baseRoles
-		session.Save(r, w)
-		http.Redirect(w, r, "/select-role", http.StatusFound)
-	} else {
-		// Kasus aneh: pengguna ada tapi tidak punya peran
+	if len(baseRoles) == 0 {
 		session.AddFlash("Akun Anda tidak memiliki peran. Hubungi administrator.")
 		session.Save(r, w)
 		http.Redirect(w, r, "/", http.StatusFound)
+	} else {
+		session.Values["active_role"] = baseRoles[0]
+		session.Save(r, w)
+		http.Redirect(w, r, "/dashboard", http.StatusFound)
 	}
 }
 

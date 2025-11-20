@@ -12,7 +12,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Definisikan struct untuk data aplikasi
 type Application struct {
 	Name      string
 	Slug      string
@@ -32,15 +31,13 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 
 	userID, ok := session.Values["user_id"].(int)
 	if !ok {
-		// Jika user_id tidak ada, berarti belum login / session expired
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
-	user, err := models.FindUserByID(dc.env.DB, fmt.Sprintf("%d", userID)) // Gunakan user_id
+	user, err := models.FindUserByID(dc.env.DB, fmt.Sprintf("%d", userID))
 	if err != nil {
 		log.Printf("ERROR: Gagal mengambil user %d dari DB: %v", userID, err)
-		// Hancurkan session jika user tidak ditemukan di DB
 		session.Options.MaxAge = -1
 		session.Save(r, w)
 		http.Error(w, "Gagal memuat data pengguna.", http.StatusInternalServerError)
@@ -49,10 +46,8 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 
 	if user.Status != "aktif" {
 		log.Printf("INFO: Akses dashboard ditolak untuk user %d karena status: %s", userID, user.Status)
-		// Hancurkan session jika user tidak aktif
 		session.Options.MaxAge = -1
 		session.Save(r, w)
-		// Tampilkan pesan error yang sesuai
 		http.Error(w, fmt.Sprintf("Akun Anda berstatus '%s'. Tidak dapat mengakses dashboard.", user.Status), http.StatusForbidden)
 		return
 	}
@@ -66,7 +61,7 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 
 	var currentBaseRoles []string
 	var currentAttributes []map[string]interface{}
-	var allCurrentRoleNames []string // Untuk query aplikasi
+	var allCurrentRoleNames []string
 
 	for _, role := range allRolesFromDB {
 		allCurrentRoleNames = append(allCurrentRoleNames, role.Name)
@@ -81,9 +76,7 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Cek apakah peran aktif sudah dipilih
 	activeRoleFromSession, sessionHasActiveRole := session.Values["active_role"].(string)
-	// Validasi: Apakah peran aktif dari session masih dimiliki oleh user?
 	isValidActiveRole := false
 	if sessionHasActiveRole && activeRoleFromSession != "" {
 		for _, dbRole := range currentBaseRoles {
@@ -94,38 +87,27 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	var finalActiveRole string // Peran aktif yang akan digunakan
+	var finalActiveRole string
 
 	if !isValidActiveRole {
-		// Jika peran aktif dari session tidak valid (misal dicabut admin) atau belum dipilih
-		if len(currentBaseRoles) > 1 {
-			// Jika user punya > 1 peran dasar SEKARANG, paksa pilih lagi
-			session.Values["available_roles"] = currentBaseRoles // Update daftar peran di session
-			delete(session.Values, "active_role")                // Hapus peran aktif yang lama
-			session.Save(r, w)
-			http.Redirect(w, r, "/select-role", http.StatusFound)
-			return
-		} else if len(currentBaseRoles) == 1 {
-			// Jika user hanya punya 1 peran dasar SEKARANG, otomatis set itu
+		if len(currentBaseRoles) == 1 {
 			finalActiveRole = currentBaseRoles[0]
-			session.Values["active_role"] = finalActiveRole // Update session
-			session.Save(r, w)                              // Simpan perubahan session
+			session.Values["active_role"] = finalActiveRole
+			session.Save(r, w)
 		} else {
-			// Jika user tidak punya peran dasar SEKARANG (kasus aneh/dicabut semua)
 			log.Printf("WARNING: User %d tidak memiliki peran dasar aktif.", userID)
-			session.Options.MaxAge = -1 // Logout paksa
+			session.Options.MaxAge = -1
 			session.Save(r, w)
 			http.Error(w, "Anda tidak memiliki peran dasar yang aktif.", http.StatusForbidden)
 			return
 		}
 	} else {
-		// Jika peran aktif dari session masih valid, gunakan itu
 		finalActiveRole = activeRoleFromSession
 	}
 
 	rolesToQuery := []string{finalActiveRole}
 	if finalActiveRole == "dosen" {
-		for _, attrMap := range currentAttributes { // currentAttributes didapat dari Fase 1
+		for _, attrMap := range currentAttributes {
 			if roleName, ok := attrMap["role"].(string); ok {
 				rolesToQuery = append(rolesToQuery, roleName)
 			}
@@ -133,20 +115,19 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 	}
 	rolesToQuery = uniqueStrings(rolesToQuery)
 
-	// Query aplikasi berdasarkan SEMUA peran TERBARU (base + attribute)
-	var accessibleApps []Application // Atau []Application jika tidak perlu grouping
+	appsByRole := make(map[string][]Application)
 	if len(rolesToQuery) > 0 {
 		queryArgs := make([]interface{}, len(rolesToQuery))
 		for i, v := range rolesToQuery {
 			queryArgs[i] = v
 		}
 		queryBase := `
-			SELECT DISTINCT a.name, a.slug, a.target_url
+			SELECT a.name, a.slug, a.target_url, r.name as granting_role
 			FROM applications a
 			JOIN application_access aa ON a.id = aa.application_id
 			JOIN roles r ON aa.role_id = r.id
 			WHERE r.name IN (?)
-            ORDER BY a.name`
+            ORDER BY r.name, a.name`
 
 		query, args, err := sqlx.In(queryBase, rolesToQuery)
 		if err != nil {
@@ -167,21 +148,21 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 
 		for appRows.Next() {
 			var app Application
-			if err := appRows.Scan(&app.Name, &app.Slug, &app.TargetURL); err != nil {
-				log.Printf("Error scanning application row: %v", err) // Log error scan
+			var grantingRole string
+			if err := appRows.Scan(&app.Name, &app.Slug, &app.TargetURL, &grantingRole); err != nil {
+				log.Printf("Error scanning application row: %v", err)
 				continue
 			}
-			accessibleApps = append(accessibleApps, app)
+			appsByRole[grantingRole] = append(appsByRole[grantingRole], app)
 		}
 	}
 
 	data := map[string]interface{}{
-		"UserName":   user.Name,       // Gunakan nama terbaru dari DB
-		"ActiveRole": finalActiveRole, // Gunakan peran aktif yang sudah divalidasi/diset
-		"AppsByRole": accessibleApps,
+		"UserName":   user.Name,
+		"ActiveRole": finalActiveRole,
+		"AppsByRole": appsByRole,
 	}
 
-	// Render template dashboard
 	err = dc.env.Templates.ExecuteTemplate(w, "dashboard.html", data)
 	if err != nil {
 		log.Printf("ERROR rendering dashboard template: %v", err)

@@ -19,7 +19,7 @@ func InitSessionStore() *sessions.CookieStore {
 	store := sessions.NewCookieStore([]byte(sessionKey))
 	store.Options = &sessions.Options{
 		Path:     "/",
-		MaxAge:   86400 * 7, // 7 hari
+		MaxAge:   86400 * 7,
 		HttpOnly: true,
 		// Secure: true, // <-- Aktifkan ini saat sudah menggunakan HTTPS (production)
 	}

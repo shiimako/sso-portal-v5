@@ -10,6 +10,7 @@ import (
 	"sso-portal-v3/controllers/authcontroller"
 	"sso-portal-v3/controllers/dashboardcontroller"
 	"sso-portal-v3/controllers/redirectcontroller"
+	"sso-portal-v3/controllers/usercontroller"
 	"sso-portal-v3/handlers"
 	"sso-portal-v3/middleware"
 	"sso-portal-v3/views"
@@ -22,19 +23,19 @@ func main() {
 
 	// Load environment variables dari file .env
 	err := godotenv.Load()
-    if err != nil {
-        log.Println("Peringatan: Gagal memuat file .env")
-    }
+	if err != nil {
+		log.Println("Peringatan: Gagal memuat file .env")
+	}
 
 	// Register tipe data kustom untuk session
 	gob.Register([]map[string]interface{}{}) // Untuk menyimpan slice of map di session
 
 	// Inisialisasi database
 	db, err := config.InitDB()
-    if err != nil {
-        log.Fatalf("Gagal inisialisasi database: %v", err)
-    }
-    defer db.Close()
+	if err != nil {
+		log.Fatalf("Gagal inisialisasi database: %v", err)
+	}
+	defer db.Close()
 
 	// Inisialisasi session store
 	sessionStore := config.InitSessionStore()
@@ -47,11 +48,11 @@ func main() {
 
 	// Inisialisasi environment untuk handler
 	env := &handlers.Env{
-		DB:           	db,
-		Store: 			sessionStore,
-		Templates:    	templates,
-		SessionName:    os.Getenv("SESSION_NAME"),
-		BaseURL: 	  	os.Getenv("APP_BASE_URL"),
+		DB:          db,
+		Store:       sessionStore,
+		Templates:   templates,
+		SessionName: os.Getenv("SESSION_NAME"),
+		BaseURL:     os.Getenv("APP_BASE_URL"),
 	}
 
 	// Inisialisasi Google OAuth2 config
@@ -63,39 +64,45 @@ func main() {
 	dashboardCtrl := dashboardcontroller.NewDashboardController(env)
 	adminCtrl := admincontroller.NewAdminController(env)
 	redirectCtrl := redirectcontroller.NewRedirectController(env)
+	userCtrl := usercontroller.NewUserController(env)
 
 	// Inisialisasi router
 	r := mux.NewRouter()
 
-	// Route untuk halaman login
+	
+	// ===================================
+	// AUTHENTICATION ROUTES
+	// ====================================
 	r.HandleFunc("/", authCtrl.ShowLoginPage).Methods("GET")
-	// Route untuk login dengan Google
 	r.HandleFunc("/auth/google/login", authCtrl.LoginWithGoogle).Methods("GET")
-	// Route untuk callback dari Google
 	r.HandleFunc("/auth/google/callback", authCtrl.GoogleCallback).Methods("GET")
-	// Route untuk select role
-	r.HandleFunc("/select-role", authCtrl.SelectRolePage).Methods("GET") 
-	// Route untuk set role
+	r.HandleFunc("/select-role", authCtrl.SelectRolePage).Methods("GET")
 	r.HandleFunc("/set-role", authCtrl.SelectRoleHandler).Methods("GET")
-	// Route untuk logout
 	r.HandleFunc("/logout", authCtrl.Logout).Methods("GET")
 
-	// Route untuk dashboard
+	// ===================================
+	// DASHBOARD ROUTES
+	// ====================================
 	r.HandleFunc("/dashboard", dashboardCtrl.Index).Methods("GET")
 
-	// Rute Admin
-	// Buat subrouter khusus untuk semua path yang diawali '/admin'
-	adminRouter := r.PathPrefix("/admin").Subrouter()
-	// Terapkan middleware "satpam" ke semua rute di dalam subrouter ini
-	adminRouter.Use(middleware.AdminMiddleware(env))
-
-	// Buat handler admin dashboard sementara untuk testing
-	adminRouter.HandleFunc("/dashboard", adminCtrl.Dashboard).Methods("GET")
+	// ===================================
+	// USER PROFILE ROUTES
+	// ====================================
+	r.HandleFunc("/profile/edit", userCtrl.ShowProfileForm).Methods("GET")
+	r.HandleFunc("/profile/update", userCtrl.HandleProfileUpdate).Methods("POST")
 
 	// ===================================
 	// REDIRECT MANAGEMENT
 	// ====================================
 	r.HandleFunc("/redirect", redirectCtrl.RedirectToApp).Methods("GET")
+
+
+	// ===================================
+	// ADMIN ROUTES
+	// ====================================
+	adminRouter := r.PathPrefix("/admin").Subrouter()
+	adminRouter.Use(middleware.AdminMiddleware(env))
+	adminRouter.HandleFunc("/dashboard", adminCtrl.Dashboard).Methods("GET")
 
 	// ===================================
 	// USER MANAGEMENT
@@ -131,7 +138,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	log.Printf("Server berjalan di http://localhost:%s", port)
-	err = http .ListenAndServe(":"+port, r)
+	err = http.ListenAndServe(":"+port, r)
 	if err != nil {
 		log.Fatalf("Gagal menjalankan server: %v", err)
 	}

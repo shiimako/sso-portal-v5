@@ -68,7 +68,7 @@
         </div>
         <div class="header-info">
             <span>{{.UserName}} (Aktif: {{.ActiveRole}})</span> |
-            <a href="/select-role">Ganti Peran</a> |
+            <a href="/profile/edit">Edit Profil</a> |
             <a href="/logout" class="logout-btn">Logout</a>
         </div>
     </div>
@@ -85,19 +85,21 @@
         </div>
         {{end}}
 
-        <div class="app-grid">
-            {{/* Correctly range over the SLICE sent with the key "AppsByRole" */}}
-            {{range .AppsByRole}}
-                <div class="app-card">
-                    <h4>{{.Name}}</h4>
-                    <p>Klik untuk mengakses sistem {{.Name}}.</p>
-                    <a href="/redirect?app={{.Slug}}">Masuk</a>
+            {{range $roleName, $appList := .AppsByRole}}
+            <div style="margin-top: 10px;">
+                <h4>Aplikasi untuk Peran: {{ $roleName }}</h4>
+                <div class="app-grid">
+                    {{range $appList}}
+                        <div class="app-card">
+                            <h3>{{.Name}}</h3>
+                            <p>Klik untuk mengakses sistem {{.Name}}.</p>
+                            <a href="/redirect?app={{.Slug}}">Masuk</a>
+                        </div>
+                    {{end}}
                 </div>
-            {{else}}
-                {{/* This else is executed if the .AppsByRole slice is empty */}}
-                <p>Tidak ada aplikasi yang tersedia untuk peran Anda saat ini.</p>
-            {{end}} {{/* End of the range block */}}
-        </div> {{/* End of app-grid div */}}
-    </div> {{/* End of container div */}}
+            </div>
+        {{else}}
+             <p>Tidak ada aplikasi yang tersedia untuk peran Anda saat ini.</p>
+        {{end}}
 </body>
 </html>
