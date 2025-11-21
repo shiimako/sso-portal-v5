@@ -3,16 +3,22 @@
 package models
 
 import (
+	"strconv"
+	"strings"
+
 	"github.com/jmoiron/sqlx"
 )
 
 // Application mendefinisikan struktur data untuk sebuah aplikasi klien.
 type Application struct {
-	ID        int
-	Name      string
-	Slug      string
+	ID        int    `db:"id"`
+	Name      string `db:"name"`
+	Slug      string `db:"slug"`
 	TargetURL string `db:"target_url"`
 }
+
+var cacheRoleApps = map[string][]Application{}
+var cachePosApps = map[string][]Application{}
 
 // GetAllApplications mengambil semua data aplikasi dari database.
 func GetAllApplications(db *sqlx.DB) ([]Application, error) {
@@ -161,3 +167,61 @@ func FindApplicationBySlug(db *sqlx.DB, slug string) (Application, error) {
 	err := db.Get(&app, query, slug)
 	return app, err
 }
+
+func FindApplicationsByRole(db *sqlx.DB, roleName string) ([]Application, error) {
+
+	if apps, ok := cacheRoleApps[roleName]; ok {
+		return apps, nil
+	}
+
+	var apps []Application
+	query := `
+	SELECT a.id, a.name, a.slug, a.target_url
+	FROM applications a
+	JOIN application_role_access aa ON a.id = aa.application_id
+	JOIN roles r ON aa.role_id = r.id
+	WHERE r.name = ?`
+	err := db.Select(&apps, query, roleName)
+	return apps, err
+}
+
+func FindApplicationsByPositions(db *sqlx.DB, positionIDs []int) ([]Application, error) {
+
+	if len(positionIDs) == 0 {
+		return []Application{}, nil
+	}
+
+	key := sliceKey(positionIDs)
+
+	if apps, ok := cachePosApps[key]; ok {
+		return apps, nil
+	}
+
+	var apps []Application
+	query := `
+	SELECT DISTINCT a.id, a.name, a.slug, a.target_url
+	FROM applications a
+	JOIN application_position_access aa ON a.id = aa.application_id
+	WHERE aa.position_id IN (?)`
+	query, args, err := sqlx.In(query, positionIDs)
+	if err != nil {
+		return nil, err
+	}
+	query = db.Rebind(query)
+	err = db.Select(&apps, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	cachePosApps[key] = apps
+
+	return apps, nil
+}
+
+func sliceKey(ints []int) string {
+    key := make([]string, len(ints))
+    for i, v := range ints {
+        key[i] = strconv.Itoa(v)
+    }
+    return strings.Join(key, ",")
+}
+

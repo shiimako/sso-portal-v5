@@ -8,15 +8,7 @@ import (
 	"net/http"
 	"sso-portal-v3/handlers"
 	"sso-portal-v3/models"
-
-	"github.com/jmoiron/sqlx"
 )
-
-type Application struct {
-	Name      string
-	Slug      string
-	TargetURL string
-}
 
 type DashboardController struct {
 	env *handlers.Env
@@ -29,13 +21,13 @@ func NewDashboardController(env *handlers.Env) *DashboardController {
 func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 	session, _ := dc.env.Store.Get(r, dc.env.SessionName)
 
-	userID, ok := session.Values["user_id"].(int)
+	userID, ok := session.Values["user_id"]
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
-	user, err := models.FindUserByID(dc.env.DB, fmt.Sprintf("%d", userID))
+	user, err := models.FindUserByID(dc.env.DB, userID.(int))
 	if err != nil {
 		log.Printf("ERROR: Gagal mengambil user %d dari DB: %v", userID, err)
 		session.Options.MaxAge = -1
@@ -52,115 +44,56 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	allRolesFromDB, err := models.GetUserRolesAndAttributes(dc.env.DB, userID)
-	if err != nil {
-		log.Printf("ERROR: Gagal mengambil peran terbaru untuk user %d: %v", userID, err)
-		http.Error(w, "Gagal mengambil data peran.", http.StatusInternalServerError)
-		return
-	}
+	role := user.Roles[0].Name
 
-	var currentBaseRoles []string
-	var currentAttributes []map[string]interface{}
-	var allCurrentRoleNames []string
-
-	for _, role := range allRolesFromDB {
-		allCurrentRoleNames = append(allCurrentRoleNames, role.Name)
-		if role.Type == "base" {
-			currentBaseRoles = append(currentBaseRoles, role.Name)
-		} else if role.Type == "attribute" {
-			attr := map[string]interface{}{"role": role.Name}
-			if role.Scope.Valid {
-				attr["scope"] = role.Scope.String
-			}
-			currentAttributes = append(currentAttributes, attr)
-		}
-	}
-
-	activeRoleFromSession, sessionHasActiveRole := session.Values["active_role"].(string)
-	isValidActiveRole := false
-	if sessionHasActiveRole && activeRoleFromSession != "" {
-		for _, dbRole := range currentBaseRoles {
-			if dbRole == activeRoleFromSession {
-				isValidActiveRole = true
-				break
-			}
-		}
-	}
+	activeRole, ok := session.Values["active_role"].(string)
+	isValid := ok && activeRole == role
 
 	var finalActiveRole string
-
-	if !isValidActiveRole {
-		if len(currentBaseRoles) == 1 {
-			finalActiveRole = currentBaseRoles[0]
-			session.Values["active_role"] = finalActiveRole
-			session.Save(r, w)
-		} else {
-			log.Printf("WARNING: User %d tidak memiliki peran dasar aktif.", userID)
-			session.Options.MaxAge = -1
-			session.Save(r, w)
-			http.Error(w, "Anda tidak memiliki peran dasar yang aktif.", http.StatusForbidden)
-			return
-		}
+	finalActiveRole = role
+	if isValid {
+		finalActiveRole = activeRole
 	} else {
-		finalActiveRole = activeRoleFromSession
+		session.Values["active_role"] = role
+		session.Save(r, w)
 	}
 
-	rolesToQuery := []string{finalActiveRole}
+	positionsToQuery := []int{}
+
 	if finalActiveRole == "dosen" {
-		for _, attrMap := range currentAttributes {
-			if roleName, ok := attrMap["role"].(string); ok {
-				rolesToQuery = append(rolesToQuery, roleName)
-			}
+		for _, pos := range user.Positions {
+			positionsToQuery = append(positionsToQuery, pos.PositionID)
 		}
 	}
-	rolesToQuery = uniqueStrings(rolesToQuery)
 
-	appsByRole := make(map[string][]Application)
-	if len(rolesToQuery) > 0 {
-		queryArgs := make([]interface{}, len(rolesToQuery))
-		for i, v := range rolesToQuery {
-			queryArgs[i] = v
-		}
-		queryBase := `
-			SELECT a.name, a.slug, a.target_url, r.name as granting_role
-			FROM applications a
-			JOIN application_access aa ON a.id = aa.application_id
-			JOIN roles r ON aa.role_id = r.id
-			WHERE r.name IN (?)
-            ORDER BY r.name, a.name`
+	roleapps, err := models.FindApplicationsByRole(dc.env.DB, finalActiveRole)
+	if err != nil {
+    log.Printf("ERROR: Gagal mengambil aplikasi untuk role %s user %d: %v", finalActiveRole, user.ID, err)
+    http.Error(w, "Gagal memuat aplikasi untuk dashboard.", http.StatusInternalServerError)
+    return
+	}
 
-		query, args, err := sqlx.In(queryBase, rolesToQuery)
+	positionapps := []models.Application{}
+	if finalActiveRole == "dosen" && len(positionsToQuery) > 0 {
+		positionapps, err = models.FindApplicationsByPositions(dc.env.DB, positionsToQuery)
 		if err != nil {
-			log.Printf("Error query applications for roles %v: %v", allCurrentRoleNames, err)
-			http.Error(w, "Gagal mengambil data aplikasi", http.StatusInternalServerError)
+			log.Printf("ERROR: Gagal mengambil aplikasi untuk posisi dosen user %d: %v", user.ID, err)
+			http.Error(w, "Gagal memuat aplikasi untuk dashboard.", http.StatusInternalServerError)
 			return
 		}
-		query = dc.env.DB.Rebind(query)
-
-		appRows, err := dc.env.DB.Query(query, args...)
-
-		if err != nil {
-			log.Printf("Error query applications for roles %v: %v", rolesToQuery, err)
-			http.Error(w, "Gagal mengambil data aplikasi", http.StatusInternalServerError)
-			return
-		}
-		defer appRows.Close()
-
-		for appRows.Next() {
-			var app Application
-			var grantingRole string
-			if err := appRows.Scan(&app.Name, &app.Slug, &app.TargetURL, &grantingRole); err != nil {
-				log.Printf("Error scanning application row: %v", err)
-				continue
-			}
-			appsByRole[grantingRole] = append(appsByRole[grantingRole], app)
-		}
+	}
+	apps := map[int]models.Application{}
+	for _, app := range roleapps {
+		apps[app.ID] = app
+	}
+	for _, app := range positionapps {
+		apps[app.ID] = app
 	}
 
 	data := map[string]interface{}{
 		"UserName":   user.Name,
 		"ActiveRole": finalActiveRole,
-		"AppsByRole": appsByRole,
+		"Apps": apps,
 	}
 
 	err = dc.env.Templates.ExecuteTemplate(w, "dashboard.html", data)
@@ -169,16 +102,4 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Gagal menampilkan halaman dashboard", http.StatusInternalServerError)
 	}
 
-}
-
-func uniqueStrings(slice []string) []string {
-	keys := make(map[string]bool)
-	list := []string{}
-	for _, entry := range slice {
-		if _, value := keys[entry]; !value {
-			keys[entry] = true
-			list = append(list, entry)
-		}
-	}
-	return list
 }

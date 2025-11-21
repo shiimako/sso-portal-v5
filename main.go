@@ -76,8 +76,6 @@ func main() {
 	r.HandleFunc("/", authCtrl.ShowLoginPage).Methods("GET")
 	r.HandleFunc("/auth/google/login", authCtrl.LoginWithGoogle).Methods("GET")
 	r.HandleFunc("/auth/google/callback", authCtrl.GoogleCallback).Methods("GET")
-	r.HandleFunc("/select-role", authCtrl.SelectRolePage).Methods("GET")
-	r.HandleFunc("/set-role", authCtrl.SelectRoleHandler).Methods("GET")
 	r.HandleFunc("/logout", authCtrl.Logout).Methods("GET")
 
 	// ===================================
@@ -109,11 +107,6 @@ func main() {
 	// ====================================
 	adminRouter.HandleFunc("/users", adminCtrl.ListUsers).Methods("GET")
 	adminRouter.HandleFunc("/users/detail/{id}", adminCtrl.DetailUser).Methods("GET")
-	adminRouter.HandleFunc("/users/new", adminCtrl.NewUserForm).Methods("GET")
-	adminRouter.HandleFunc("/users/create", adminCtrl.CreateUser).Methods("POST")
-	adminRouter.HandleFunc("/users/edit/{id}", adminCtrl.EditUserForm).Methods("GET")
-	adminRouter.HandleFunc("/users/update/{id}", adminCtrl.UpdateUser).Methods("POST")
-	adminRouter.HandleFunc("/users/delete/{id}", adminCtrl.DeleteUser).Methods("POST")
 
 	// ===================================
 	// APPLICATION MANAGEMENT
@@ -126,15 +119,6 @@ func main() {
 	adminRouter.HandleFunc("/applications/update/{id}", adminCtrl.UpdateApplication).Methods("POST")
 	adminRouter.HandleFunc("/applications/delete/{id}", adminCtrl.DeleteApplication).Methods("POST")
 
-	// ===================================
-	// ROLE MANAGEMENT
-	// ====================================
-	adminRouter.HandleFunc("/roles", adminCtrl.ListRoles).Methods("GET")
-	// adminRouter.HandleFunc("/roles/new", adminCtrl.NewRoleForm).Methods("GET")
-	// adminRouter.HandleFunc("/roles/create", adminCtrl.CreateRole).Methods("POST")
-	// adminRouter.HandleFunc("/roles/edit/{id}", adminCtrl.EditRoleForm).Methods("GET")
-	// adminRouter.HandleFunc("/roles/update/{id}", adminCtrl.UpdateRole).Methods("POST")
-	// adminRouter.HandleFunc("/roles/delete/{id}", adminCtrl.DeleteRole).Methods("POST")
 
 	port := os.Getenv("PORT")
 	log.Printf("Server berjalan di http://localhost:%s", port)

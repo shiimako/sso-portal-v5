@@ -21,12 +21,11 @@ func NewRedirectController(env *handlers.Env) *RedirectController {
 
 // Claims adalah struktur data (Payload) di dalam JWT.
 type Claims struct {
-	Name       string                   `json:"name"`
-	Email      string                   `json:"email"`
-	Avatar     string                   `json:"avatar"`
-	BaseRole   string                   `json:"base_role"`
-	Attributes []map[string]interface{} `json:"attributes"`
-	Profile    map[string]string        `json:"profile"`
+	Name    string            `json:"name"`
+	Email   string            `json:"email"`
+	Avatar  string            `json:"avatar"`
+	Role    string            `json:"role"`
+	Profile map[string]string `json:"profile"`
 	jwt.RegisteredClaims
 }
 
@@ -45,27 +44,10 @@ func (rc *RedirectController) RedirectToApp(w http.ResponseWriter, r *http.Reque
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
-	user, err := models.FindUserByID(rc.env.DB, fmt.Sprintf("%d", userID))
+	user, err := models.FindUserByID(rc.env.DB, userID)
 	if err != nil {
 		http.Error(w, "Gagal mengambil detail pengguna", http.StatusInternalServerError)
 		return
-	}
-
-	allroles, err := models.GetUserRolesAndAttributes(rc.env.DB, userID)
-	if err != nil {
-		http.Error(w, "Gagal mengambil peran pengguna", http.StatusInternalServerError)
-		return
-	}
-
-	var attributes []map[string]interface{}
-	for _, role := range allroles {
-		if role.Type == "attribute" {
-			attr := map[string]interface{}{"role": role.Name}
-			if role.Scope.Valid {
-				attr["scope"] = role.Scope.String
-			}
-			attributes = append(attributes, attr)
-		}
 	}
 
 	appSlug := r.URL.Query().Get("app")
@@ -81,36 +63,20 @@ func (rc *RedirectController) RedirectToApp(w http.ResponseWriter, r *http.Reque
 	}
 
 	profileData := make(map[string]string)
-	if user.Student_ID.Valid {
-		profileData["student_id"] = fmt.Sprintf("%d", user.Student_ID.Int64)
+	if user.Student.ID != 0 {
+		profileData["student_id"] = fmt.Sprintf("%d", user.Student.ID)
 	}
-	if user.NIM.Valid {
-		profileData["nim"] = user.NIM.String
-	}
-	if user.Lecturer_ID.Valid {
-		profileData["lecturer_id"] = fmt.Sprintf("%d", user.Lecturer_ID.Int64)
-	}
-	if user.NIP.Valid {
-		profileData["nip"] = user.NIP.String
-	}
-	if user.NIDN.Valid {
-		profileData["nidn"] = user.NIDN.String
-	}
-	if user.Address.Valid {
-		profileData["address"] = user.Address.String
-	}
-	if user.Phone.Valid {
-		profileData["phone"] = user.Phone.String
+	if user.Lecturer.ID != 0 {
+		profileData["lecturer_id"] = fmt.Sprintf("%d", user.Lecturer.ID)
 	}
 
 	expirationTime := time.Now().Add(10 * time.Second)
 	claims := &Claims{
-		Name:       user.Name,
-		Email:      user.Email,
-		Avatar:     user.Avatar.String,
-		BaseRole:   activeRole,
-		Attributes: attributes,
-		Profile:    profileData,
+		Name:    user.Name,
+		Email:   user.Email,
+		Avatar:  user.Avatar.String,
+		Role:    activeRole,
+		Profile: profileData,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			Subject:   fmt.Sprintf("%d", userID),
