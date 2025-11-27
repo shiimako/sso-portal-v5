@@ -4,27 +4,50 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Portal SSO</title>
-    <style>
-        body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; background-color: #f4f4f4; }
-        .login-container { text-align: center; background-color: white; padding: 40px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .login-button { display: inline-block; padding: 12px 24px; background-color: #4285F4; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; }
-        .flash-error { background-color: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 10px; border-radius: 5px; margin-bottom: 20px; }
-    </style>
-</head>
-<body>
-    <div class="login-container">
-        <h1>Selamat Datang di Portal SSO</h1>
-        <p>Silakan login untuk melanjutkan.</p>
 
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="bg-white shadow-xl rounded-2xl p-10 max-w-md w-full text-center border">
+        
+        <!-- Logo -->
+        <div class="flex justify-center mb-6">
+            <img src="/static/Logo-PNC.png" class="w-20 h-20 object-contain" alt="Logo">
+        </div>
+
+        <!-- Title -->
+        <h1 class="text-2xl font-bold text-gray-800 mb-2">Portal SSO Politeknik Negeri Cilacap</h1>
+        <p class="text-gray-600 mb-6">Silakan login untuk melanjutkan.</p>
+
+        <!-- Flash Messages -->
         {{with .FlashMessages}}
             {{range .}}
-                <div class="flash-error">{{.}}</div>
+                <div class="bg-red-100 text-red-700 border border-red-300 px-4 py-3 rounded-lg mb-4 text-sm">
+                    {{.}}
+                </div>
             {{end}}
         {{end}}
 
-        <a href="/auth/google/login" class="login-button">
+        <!-- Login Button -->
+        <a 
+            href="/auth/google/login"
+            class="bg-white border border-gray-300 shadow-sm hover:shadow-md transition rounded-lg px-5 py-3 w-full inline-flex items-center justify-center gap-3 text-gray-700 font-semibold"
+        >
+            <i data-lucide="mail" class="w-5 h-5"></i>
             Login dengan Google
         </a>
+
+        <p class="text-xs text-gray-400 mt-6">
+            SSO v3 &mdash; Sistem terintegrasi PNC
+        </p>
     </div>
+
+    <script>
+        lucide.createIcons();
+    </script>
+
 </body>
 </html>

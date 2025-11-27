@@ -16,8 +16,9 @@ import (
 type Env struct {
 	DB        *sqlx.DB
 	Store     *sessions.CookieStore
-	Templates *template.Template
+	Templates map[string]*template.Template
 	SessionName string
 	BaseURL   string
 	GoogleOAuthConfig *oauth2.Config
 }
+

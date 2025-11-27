@@ -1,154 +1,236 @@
-<!DOCTYPE html>
-<html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Manajemen Pengguna - Admin SSO</title>
-    <style>
-      /* Menggunakan style yang sama dengan admin-dashboard */
-      body {
-        font-family: sans-serif;
-        margin: 0;
-        background-color: #f8f9fa;
-      }
-      .header {
-        background-color: #343a40;
-        color: white;
-        padding: 15px 30px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .header h2 {
-        margin: 0;
-      }
-      .logout-btn {
-        text-decoration: none;
-        padding: 8px 12px;
-        background-color: #dc3545;
-        color: white;
-        border-radius: 5px;
-        font-size: 14px;
-      }
-      .container {
-        padding: 30px;
-      }
-      .table {
-        width: 100%;
-        border-collapse: collapse;
-        background-color: white;
-      }
-      .table th,
-      .table td {
-        border: 1px solid #dee2e6;
-        padding: 12px;
-        text-align: left;
-      }
-      .table th {
-        background-color: #e9ecef;
-      }
-      .btn {
-        text-decoration: none;
-        padding: 6px 10px;
-        border-radius: 5px;
-        color: white;
-      }
-      .btn-edit {
-        background-color: #ffc107;
-      }
-      .btn-primary {
-        background-color: #007bff;
-      }
-      .btn-delete {
-        background-color: #dc3545;
-      }
-      .btn-add {
-        background-color: #007bff;
-        display: inline-block;
-        margin-bottom: 20px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <h2>
-        <a href="/admin/dashboard" style="color: white; text-decoration: none"
-          >Admin SSO Portal</a
-        >
-      </h2>
-      <a href="/admin/dashboard" class="logout-btn">Kembali</a>
+{{define "content"}}
+<div x-data="userList()" class="space-y-6">
+  <!-- Header -->
+  <div class="flex justify-between items-center">
+  <h3 class="text-xl font-semibold flex items-center gap-2">
+    <i data-lucide="users" class="w-5 h-5 text-gray-700"></i>
+    Manajemen Pengguna
+  </h3>
+
+  <a
+    href="/admin/dashboard"
+    class="text-gray-600 hover:text-gray-900 text-sm flex items-center gap-2"
+  >
+    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+    Kembali
+  </a>
+</div>
+
+<hr />
+
+<!-- Filters -->
+<div class="flex flex-col sm:flex-row gap-4 w-full">
+  <form method="GET" class="flex gap-3 w-full">
+    
+    <!-- Search Input Full Width -->
+    <div class="relative flex-1">
+      <i data-lucide="search" class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2"></i>
+      <input
+        type="text"
+        name="search"
+        value="{{.Data.Search}}"
+        placeholder="Cari nama pengguna..."
+        class="w-full p-2 pl-9 border rounded-md"
+      />
     </div>
 
-    <div class="container">
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <h3>Manajemen Pengguna</h3>
-        <a href="/admin/users/new" class="btn btn-add">Tambah Pengguna Baru</a>
-      </div>
-      <hr />
+    <!-- Dropdown Role -->
+    <select name="role" class="p-2 border rounded-md min-w-[140px]">
+      <option value="">Semua Peran</option>
+      <option value="admin" {{if eq .Data.Role "admin"}}selected{{end}}>Admin</option>
+      <option value="dosen" {{if eq .Data.Role "dosen"}}selected{{end}}>Dosen</option>
+      <option value="mahasiswa" {{if eq .Data.Role "mahasiswa"}}selected{{end}}>Mahasiswa</option>
+    </select>
 
-      {{if .Flashes}}
-      <div
-        class="alert alert-success"
-        style="
-          background: #d4edda;
-          padding: 10px;
-          border-radius: 5px;
-          color: #155724;
-        "
-      >
-        {{range .Flashes}}
-        <p>{{.}}</p>
-        {{end}}
-      </div>
+    <!-- Search Button -->
+    <button
+      class="bg-gray-800 hover:bg-black text-white px-4 py-2 rounded flex items-center gap-2"
+    >
+      <i data-lucide="search-check" class="w-4 h-4"></i>
+      Cari
+    </button>
+
+  </form>
+</div>
+
+<p class="text-sm text-gray-600">
+  Page: <span x-text="page"></span> — Limit: <span x-text="limit"></span>
+</p>
+
+  <!-- Table -->
+  <div class="bg-white shadow-md rounded-xl overflow-hidden border">
+  <table class="w-full text-sm">
+    <thead class="bg-gray-100 text-gray-700 border-b">
+      <tr>
+        <th class="px-4 py-3 text-left font-semibold">ID</th>
+        <th class="px-4 py-3 text-left font-semibold">Nama</th>
+        <th class="px-4 py-3 text-left font-semibold">Email</th>
+        <th class="px-4 py-3 text-left font-semibold">Status</th>
+        <th class="px-4 py-3 text-left font-semibold">Peran</th>
+        <th class="px-4 py-3 text-left font-semibold w-40">Aksi</th>
+      </tr>
+    </thead>
+
+    <tbody class="divide-y">
+      {{range .Data.Users}}
+      <tr class="hover:bg-gray-50 transition">
+        <td class="px-4 py-3">{{.ID}}</td>
+        <td class="px-4 py-3 font-medium">{{.Name}}</td>
+        <td class="px-4 py-3">{{.Email}}</td>
+        <td class="px-4 py-3 capitalize">{{.Status}}</td>
+        <td class="px-4 py-3 capitalize">{{.Role}}</td>
+
+        <td class="px-4 py-3">
+          <div class="flex gap-2">
+            <!-- Detail -->
+            <a
+              href="/admin/users/detail/{{.ID}}"
+              class="flex items-center gap-1 bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded-md text-xs shadow-sm"
+            >
+              <i data-lucide="info" class="w-3 h-3"></i>
+              Detail
+            </a>
+
+            <!-- Edit -->
+            <button
+              @click="showUnavailable()"
+              class="flex items-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded-md text-xs shadow-sm"
+            >
+              <i data-lucide="pencil" class="w-3 h-3"></i>
+              Edit
+            </button>
+
+            <!-- Hapus -->
+            <button
+              @click="showUnavailable()"
+              class="flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs shadow-sm"
+            >
+              <i data-lucide="trash-2" class="w-3 h-3"></i>
+              Hapus
+            </button>
+          </div>
+        </td>
+      </tr>
       {{end}}
+    </tbody>
+  </table>
+</div>
 
-      <table class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nama</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Peran</th>
-            <th>Aksi</th>
-          </tr>
-        </thead>
-        <tbody>
-          {{range .Users}}
-          <tr>
-            <td>{{.ID}}</td>
-            <td>{{.Name}}</td>
-            <td>{{.Email}}</td>
-            <td>{{.Status}}</td>
-            <td>{{.Roles}}</td>
-            <td>
-              <a href="/admin/users/detail/{{.ID}}" class="btn btn-primary">Detail</a>
-              <a href="/admin/users/edit/{{.ID}}" class="btn btn-edit">Edit</a>
-              <form
-                action="/admin/users/delete/{{.ID}}"
-                method="POST"
-                style="display: inline"
-                onsubmit="return confirm('Apakah Anda yakin ingin menghapus pengguna ini? Data yang terhapus tidak dapat dikembalikan.');"
-              >
-                <button
-                  type="submit"
-                  class="btn btn-delete"
-                  style="cursor: pointer"
-                >
-                  Hapus
-                </button>
-              </form>
-            </td>
-          </tr>
-          {{end}}
-        </tbody>
-      </table>
+
+  <!-- Modal - Fitur Tidak Tersedia -->
+  <div
+    x-show="modal"
+    x-cloak
+    x-transition
+    class="fixed inset-0 bg-black/40 flex items-center justify-center p-4"
+  >
+    <div
+      class="bg-white rounded-xl shadow-lg p-6 max-w-md w-full"
+      @click.outside="modal=false"
+    >
+      <h2 class="text-lg font-semibold mb-2 flex items-center gap-2">
+  <i data-lucide="shield-alert" class="w-5 h-5 text-red-600"></i>
+  Fitur Tidak Tersedia
+</h2>
+
+      <p class="text-gray-700 mb-4">
+        Data pengguna ini dikelola secara terpusat (centralized data). Edit dan
+        hapus hanya dapat dilakukan melalui sistem utama.
+      </p>
+
+      <div class="text-right">
+        <button
+          @click="modal=false"
+          class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md"
+        >
+          Mengerti
+        </button>
+      </div>
     </div>
-  </body>
-</html>
+  </div>
+
+  <!-- Pagination Controls -->
+  <div class="flex items-center gap-4 mt-4">
+    <!-- Page Input -->
+    <div class="flex items-center gap-2">
+      <label class="text-sm">Page:</label>
+      <input
+        type="number"
+        min="1"
+        x-model.number="page"
+        class="w-20 p-2 border rounded-md"
+        @change="updatePage()"
+      />
+    </div>
+
+    <!-- Limit Input -->
+    <div class="flex items-center gap-2">
+      <label class="text-sm">Limit:</label>
+      <input
+        type="number"
+        min="1"
+        x-model.number="limit"
+        class="w-20 p-2 border rounded-md"
+        @change="updateLimit()"
+      />
+    </div>
+
+    <!-- Prev -->
+    <button
+  class="bg-gray-200 px-3 py-1 rounded-md text-sm hover:bg-gray-300 flex items-center gap-1"
+  @click="prevPage"
+  :disabled="page <= 1"
+>
+  <i data-lucide="chevron-left" class="w-4 h-4"></i>
+  Prev
+</button>
+
+    <!-- Next -->
+    <button
+  class="bg-gray-200 px-3 py-1 rounded-md text-sm hover:bg-gray-300 flex items-center gap-1"
+  @click="nextPage"
+>
+  Next
+  <i data-lucide="chevron-right" class="w-4 h-4"></i>
+</button>
+  </div>
+</div>
+
+<!-- Alpine Script -->
+<script>
+  function userList() {
+    return {
+      search: "",
+      filterRole: "",
+      modal: false,
+
+      page: Number("{{.Data.Page}}"),
+      limit: Number("{{.Data.Limit}}"),
+
+      showUnavailable() {
+        this.modal = true;
+      },
+
+      // Pagination Core
+      updatePage() {
+        window.location.href = `?page=${this.page}&limit=${this.limit}`;
+      },
+      updateLimit() {
+        this.page = 1;
+        window.location.href = `?page=${this.page}&limit=${this.limit}`;
+      },
+      prevPage() {
+        if (this.page > 1) {
+          this.page--;
+          this.updatePage();
+        }
+      },
+      nextPage() {
+        this.page++;
+        this.updatePage();
+      },
+    };
+  }
+</script>
+
+{{end}}

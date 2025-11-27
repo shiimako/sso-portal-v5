@@ -1,176 +1,172 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard - Portal SSO</title>
+{{define "content"}}
+<div x-data="dashboard()">
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background-color: #f5f7fa;
-            color: #333;
-        }
+  <!-- Content -->
+  <div class="p-6 max-w-6xl mx-auto">
+    <h3 class="text-lg font-semibold mb-2">List Aplikasi Yang tersedia</h3>
+    <hr class="mb-4" />
 
-        /* Header */
-        .header {
-            background-color: white;
-            padding: 15px 30px;
-            border-bottom: 1px solid #dcdcdc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .header h2 {
-            margin: 0;
-            font-size: 22px;
-            color: #333;
-        }
-
-        .header-info {
-            font-size: 14px;
-        }
-
-        .header-info a {
-            color: #007bff;
-            text-decoration: none;
-            margin-left: 8px;
-        }
-
-        /* Buttons */
-        .logout-btn {
-            padding: 7px 12px;
-            background-color: #dc3545;
-            color: white !important;
-            border-radius: 6px;
-            font-size: 13px;
-            transition: background 0.2s ease;
-        }
-
-        .logout-btn:hover {
-            background-color: #b52c38;
-        }
-
-        /* Container */
-        .container {
-            padding: 30px;
-        }
-
-        h3 {
-            margin-top: 0;
-        }
-
-        /* Grid App Cards */
-        .app-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 20px;
-            margin-top: 25px;
-        }
-
-        .app-card {
-            background-color: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.06);
-            border: 1px solid #e0e0e0;
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-
-        .app-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0px 5px 14px rgba(0, 0, 0, 0.1);
-        }
-
-        .app-card h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 18px;
-        }
-
-        .app-card p {
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 15px;
-        }
-
-        .app-card a {
-            display: inline-block;
-            padding: 8px 12px;
-            background-color: #28a745;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 13px;
-            transition: background 0.2s ease;
-        }
-
-        .app-card a:hover {
-            background-color: #218838;
-        }
-
-        /* Admin button */
-        .admin-btn {
-            padding: 10px 16px;
-            background-color: #007bff;
-            color: white !important;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 14px;
-            margin-bottom: 10px;
-            display: inline-block;
-        }
-
-        .admin-btn:hover {
-            background-color: #0069d9;
-        }
-
-    </style>
-</head>
-
-<body>
-
-    <!-- Header -->
-    <div class="header">
-        <h2>Portal SSO</h2>
-
-        <div class="header-info">
-            {{.UserName}} (Aktif: <b>{{.ActiveRole}}</b>)
-            <a href="/profile/edit">Edit Profil</a>
-            <a href="/logout" class="logout-btn">Logout</a>
-        </div>
+    <!-- Search (Lebar penuh grid) -->
+    <div class="mb-5 w-full">
+      <input
+        type="text"
+        placeholder="Cari aplikasi berdasarkan nama atau slug..."
+        class="w-full p-3 border rounded shadow-sm"
+        x-model="search"
+      />
     </div>
 
-    <!-- Content -->
-    <div class="container">
-        <h3>Aplikasi yang Tersedia (Peran: {{.ActiveRole}})</h3>
-        <hr />
+    {{if eq .ActiveRole "admin"}}
+    <a
+      href="/admin/dashboard"
+      class="inline-block mb-4 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+    >
+      Dashboard Admin
+    </a>
+    {{end}}
 
-        <!-- Admin special button -->
-        {{if eq .ActiveRole "admin"}}
-        <a href="/admin/dashboard" class="admin-btn">Buka Dashboard Admin</a>
-        {{end}}
-
-        <!-- App List -->
-        {{if .Apps}}
-        <div class="app-grid">
-            {{range .Apps}}
-            <div class="app-card">
-                <h3>{{.Name}}</h3>
-                <p>Akses sistem {{.Name}} melalui tombol berikut:</p>
-                <a href="/redirect?app={{.Slug}}">Masuk</a>
-            </div>
-            {{end}}
+    <!-- App Grid -->
+    <div
+      class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6"
+    >
+      {{range .Data.Apps}}
+      <div
+        class="bg-white p-5 rounded-xl shadow hover:shadow-lg cursor-pointer transition"
+        @click="openApp('{{.Slug}}')"
+        x-show="matches('{{.Slug}}', '{{.Name}}')"
+      >
+        <!-- Icon Centered -->
+        <div class="flex justify-center mb-3">
+          <img
+            src="{{if .IconURL.String}}{{.IconURL.String}}{{else}}/static/default-app.png{{end}}"
+            class="w-14 h-14 object-cover rounded"
+          />
         </div>
-        {{else}}
-        <p>Tidak ada aplikasi yang tersedia untuk peran Anda saat ini.</p>
-        {{end}}
-    </div>
 
-</body>
-</html>
+        <p class="font-medium text-center">{{.Name}}</p>
+
+        <!-- Hidden Alpine mapping -->
+        <template
+          x-init="
+                    apps['{{.Slug}}'] = {
+                        name: '{{js .Name}}',
+                        slug: '{{.Slug}}',
+                        description: '{{js .Description}}',
+                        target: '/redirect?app={{.Slug}}',
+                        icon: '{{if .IconURL.String}}{{.IconURL.String}}{{else}}/static/default-app.png{{end}}'
+                    }
+                "
+        ></template>
+      </div>
+      {{end}}
+    </div>
+  </div>
+
+  <!-- Modal Detail Aplikasi -->
+  <div
+    x-show="show"
+    class="fixed inset-0 bg-black/40 flex items-center justify-center p-4"
+    x-transition
+  >
+    <div
+      class="bg-white w-full max-w-md p-6 rounded-xl shadow-xl"
+      @click.outside="show=false"
+    >
+      <div class="flex gap-4 items-center">
+        <img :src="selected.icon" class="w-16 h-16 rounded object-cover" />
+        <div>
+          <h2 class="text-xl font-semibold" x-text="selected.name"></h2>
+          <p class="text-gray-600 text-sm" x-text="selected.slug"></p>
+        </div>
+      </div>
+
+      <p class="mt-4 text-gray-700" x-text="selected.description"></p>
+
+      <div class="mt-6">
+        <a
+          :href="selected.target"
+          class="inline-block bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded"
+        >
+          Masuk
+        </a>
+
+        <button class="ml-2 px-4 py-2 rounded border" @click="show=false">
+          Tutup
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FAB -->
+<div class="fixed bottom-6 right-6" x-data="{ fab:false }">
+
+  <!-- Menu Items -->
+  <div
+   class="absolute bottom-16 right-0 flex flex-col items-end gap-3"
+    x-show="fab"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 scale-95"
+    x-transition:enter-end="opacity-100 scale-100"
+    x-transition:leave="transition ease-in duration-150"
+    x-transition:leave-start="opacity-100 scale-100"
+    x-transition:leave-end="opacity-0 scale-95"
+    class="mb-3 flex flex-col items-end gap-3"
+  >
+
+    <!-- Email Admin -->
+    <a
+      href="mailto:{{.Data.Admin.Email}}"
+      class="bg-blue-600 text-white px-4 py-2 rounded-lg shadow hover:bg-blue-700 flex items-center gap-2"
+    >
+      <i data-lucide="mail" class="w-5 h-5"></i>
+      Email Admin
+    </a>
+
+    <!-- WhatsApp -->
+    <a
+      href="https://wa.me/{{.Data.Admin.Phone}}"
+      class="bg-green-600 text-white px-4 py-2 rounded-lg shadow hover:bg-green-700 flex items-center gap-2"
+    >
+      <i data-lucide="message-circle" class="w-5 h-5"></i>
+      WhatsApp
+    </a>
+
+  </div>
+
+  <!-- FAB Button -->
+    <button
+    @click="fab = !fab"
+    class="w-14 h-14 bg-gray-800 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-black transition"
+  >
+    <i data-lucide="plus" class="w-7 h-7 transition-transform duration-200"
+       :class="fab ? 'rotate-45' : ''">
+    </i>
+  </button>
+</div>
+
+  <!-- Alpine Component -->
+  <script>
+    function dashboard() {
+      return {
+        search: "",
+        show: false,
+        selected: {},
+        apps: {},
+
+        matches(slug, name) {
+          let q = this.search.toLowerCase();
+          return (
+            slug.toLowerCase().includes(q) || name.toLowerCase().includes(q)
+          );
+        },
+
+        openApp(slug) {
+          this.selected = this.apps[slug];
+          this.show = true;
+        },
+      };
+    }
+  </script>
+
+</div>
+{{end}}

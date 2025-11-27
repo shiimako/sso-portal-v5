@@ -1,87 +1,143 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detail Pengguna - Admin SSO</title>
-    <style>
-        /* Menggunakan style yang sama dengan form edit */
-        body { font-family: sans-serif; margin: 0; background-color: #f8f9fa; }
-        .header { background-color: #343a40; color: white; padding: 15px 30px; }
-        .container { padding: 30px; }
-        .detail-container { background-color: white; padding: 30px; border-radius: 8px; max-width: 700px; margin: auto; }
-        .detail-item { margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
-        .detail-item label { font-weight: bold; color: #555; display: block; }
-        .detail-item p { margin: 5px 0 0; font-size: 1.1em; }
-        .btn { text-decoration: none; padding: 10px 18px; border-radius: 5px; color: white; }
-        .btn-secondary { background-color: #6c757d; }
-    </style>
-</head>
-<body>
-    <div class="header">
-        <h2><a href="/admin/dashboard" style="color:white; text-decoration: none;">Admin SSO Portal</a></h2>
+{{define "content"}}
+
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-md">
+  <!-- Title -->
+  <h2 class="text-2xl font-semibold mb-1 flex items-center gap-2">
+    <i data-lucide="user" class="w-6 h-6 text-gray-700"></i>
+    Detail Pengguna
+  </h2>
+  <p class="text-gray-600 mb-6">Informasi lengkap pengguna sistem.</p>
+
+  <div class="space-y-6">
+    <!-- Nama -->
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="user-pen" class="w-4 h-4"></i>
+        Nama Lengkap
+      </h4>
+      <p class="text-lg font-medium mt-1">{{.Data.User.Name}}</p>
     </div>
 
-    <div class="container">
-        <div class="detail-container">
-            <h3>Detail Pengguna</h3>
-            <hr style="margin-bottom: 20px;">
-
-            <div class="detail-item">
-                <label>Nama Lengkap</label>
-                <p>{{.User.Name}}</p>
-            </div>
-            <div class="detail-item">
-                <label>Email</label>
-                <p>{{.User.Email}}</p>
-            </div>
-            <div class="detail-item">
-                <label>Status Akun</label>
-                <p style="text-transform: capitalize;">{{.User.Status}}</p>
-            </div>
-            <div class="detail-item">
-                <label>Peran & Atribut</label>
-                <p>
-                    {{range $i, $role := .Roles}}
-                        {{if $i}}, {{end}}<span style="text-transform: capitalize;">{{$role}}</span>
-                    {{else}}
-                        <em>Tidak ada peran yang ditetapkan.</em>
-                    {{end}}
-                </p>
-            </div>
-
-            {{if .User.NIM.Valid}}
-            <div class="detail-item">
-                <label>NIM (Mahasiswa)</label>
-                <p>{{.User.NIM.String}}</p>
-            </div>
-            {{end}}
-
-            {{if .User.NIP.Valid}}
-            <div class="detail-item">
-                <label>NIP (Dosen)</label>
-                <p>{{.User.NIP.String}}</p>
-            </div>
-            {{end}}
-            
-            {{if .User.NIDN.Valid}}
-            <div class="detail-item">
-                <label>NIDN (Dosen)</label>
-                <p>{{.User.NIDN.String}}</p>
-            </div>
-            {{end}}
-            
-            <div class="detail-item">
-                <label>Alamat</label>
-                <p>{{if .User.Address.Valid}}{{.User.Address.String}}{{else}}<em>-</em>{{end}}</p>
-            </div>
-            <div class="detail-item">
-                <label>No. Telepon</label>
-                <p>{{if .User.Phone.Valid}}{{.User.Phone.String}}{{else}}<em>-</em>{{end}}</p>
-            </div>
-            
-            <a href="/admin/users" class="btn btn-secondary" style="margin-top: 20px;">Kembali ke Daftar</a>
-        </div>
+    <!-- Email -->
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="mail" class="w-4 h-4"></i>
+        Email
+      </h4>
+      <p class="mt-1">{{.Data.User.Email}}</p>
     </div>
-</body>
-</html>
+
+    <!-- Status -->
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="shield-check" class="w-4 h-4"></i>
+        Status Akun
+      </h4>
+      <p class="capitalize mt-1">{{.Data.User.Status}}</p>
+    </div>
+
+    <!-- Role -->
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="key-round" class="w-4 h-4"></i>
+        Peran
+      </h4>
+      <p class="mt-1">
+        {{if .Data.Role}} {{.Data.Role}} {{else}}
+        <em>Tidak Ada Peran</em>
+        {{end}}
+      </p>
+    </div>
+
+    <!-- Jika Mahasiswa -->
+    {{if .Data.User.Student}} {{if .Data.Profile.NIM.Valid}}
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="id-card" class="w-4 h-4"></i>
+        NIM (Mahasiswa)
+      </h4>
+      <p class="mt-1">{{.Data.Profile.NIM.String}}</p>
+    </div>
+    {{end}} {{end}}
+
+    <!-- Jika Dosen -->
+    {{if .Data.User.Lecturer}}
+
+    <!-- Jabatan -->
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="briefcase" class="w-4 h-4"></i>
+        Jabatan
+      </h4>
+      <div class="mt-1">
+        {{if .Data.Positions}} {{range .Data.Positions}}
+        <p>{{.}}</p>
+        {{end}} {{else}}
+        <em>Tidak Memiliki Jabatan Tambahan</em>
+        {{end}}
+      </div>
+    </div>
+
+    <!-- NIP -->
+    {{if .Data.Profile.NIP.Valid}}
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="id-card" class="w-4 h-4"></i>
+        NIP (Dosen)
+      </h4>
+      <p class="mt-1">{{.Data.Profile.NIP.String}}</p>
+    </div>
+    {{end}}
+
+    <!-- NUPTK -->
+    {{if .Data.Profile.NUPTK.Valid}}
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="clipboard-list" class="w-4 h-4"></i>
+        NUPTK (Dosen)
+      </h4>
+      <p class="mt-1">{{.Data.Profile.NUPTK.String}}</p>
+    </div>
+    {{end}} {{end}}
+
+    <!-- Alamat -->
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="map-pin" class="w-4 h-4"></i>
+        Alamat
+      </h4>
+      <p class="mt-1">
+        {{if .Data.Profile.Address.Valid}} {{.Data.Profile.Address.String}}
+        {{else}}
+        <em>-</em>
+        {{end}}
+      </p>
+    </div>
+
+    <!-- No Telepon -->
+    <div class="border-b pb-4">
+      <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+        <i data-lucide="phone" class="w-4 h-4"></i>
+        No. Telepon
+      </h4>
+      <p class="mt-1">
+        {{if .Data.Profile.Phone.Valid}} {{.Data.Profile.Phone.String}} {{else}}
+        <em>-</em>
+        {{end}}
+      </p>
+    </div>
+  </div>
+
+  <!-- Back -->
+  <div class="mt-8">
+    <a
+      href="/admin/users"
+      class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md shadow-sm transition"
+    >
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      Kembali ke Daftar
+    </a>
+  </div>
+</div>
+
+{{end}}

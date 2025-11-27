@@ -1,94 +1,103 @@
-<!DOCTYPE html>
-<html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Detail Aplikasi - Admin SSO</title>
-    <style>
-      /* Menggunakan style yang sama dengan form edit */
-      body {
-        font-family: sans-serif;
-        margin: 0;
-        background-color: #f8f9fa;
-      }
-      .header {
-        background-color: #343a40;
-        color: white;
-        padding: 15px 30px;
-      }
-      .container {
-        padding: 30px;
-      }
-      .detail-container {
-        background-color: white;
-        padding: 30px;
-        border-radius: 8px;
-        max-width: 700px;
-        margin: auto;
-      }
-      .detail-item {
-        margin-bottom: 15px;
-        padding-bottom: 15px;
-        border-bottom: 1px solid #eee;
-      }
-      .detail-item label {
-        font-weight: bold;
-        color: #555;
-        display: block;
-      }
-      .detail-item p {
-        margin: 5px 0 0;
-        font-size: 1.1em;
-      }
-      .btn {
-        text-decoration: none;
-        padding: 10px 18px;
-        border-radius: 5px;
-        color: white;
-      }
-      .btn-secondary {
-        background-color: #6c757d;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-        <h2><a href="/admin/dashboard" style="color:white; text-decoration: none;">Admin SSO Portal</a></h2>
+{{define "content"}}
+
+<div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-md">
+
+    <!-- Title -->
+    <h2 class="text-2xl font-semibold mb-1 flex items-center gap-2">
+        <i data-lucide="app-window" class="w-6 h-6 text-gray-700"></i>
+        Detail Aplikasi
+    </h2>
+    <p class="text-gray-600 mb-6">Informasi lengkap aplikasi yang terdaftar di sistem.</p>
+
+    <div class="space-y-6">
+
+        <!-- Nama -->
+        <div class="border-b pb-4">
+            <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                <i data-lucide="badge-info" class="w-4 h-4"></i>
+                Nama Aplikasi
+            </h4>
+            <p class="text-lg font-medium mt-1">{{.Data.App.Name}}</p>
+        </div>
+
+        <!-- Deskripsi -->
+        <div class="border-b pb-4">
+            <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                <i data-lucide="align-left" class="w-4 h-4"></i>
+                Deskripsi
+            </h4>
+            <p class="mt-1">
+                {{if .Data.App.Description}}
+                    {{.Data.App.Description}}
+                {{else}}
+                    <em>-</em>
+                {{end}}
+            </p>
+        </div>
+
+        <!-- Slug -->
+        <div class="border-b pb-4">
+            <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                <i data-lucide="hash" class="w-4 h-4"></i>
+                Slug
+            </h4>
+            <p class="mt-1">
+                <code class="bg-gray-100 px-2 py-1 rounded text-sm">{{.Data.App.Slug}}</code>
+            </p>
+        </div>
+
+        <!-- Target URL -->
+        <div class="border-b pb-4">
+            <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                <i data-lucide="link" class="w-4 h-4"></i>
+                Target URL
+            </h4>
+            <p class="mt-1 text-blue-600 underline">
+                <a href="{{.Data.App.TargetURL}}" target="_blank">
+                    {{.Data.App.TargetURL}}
+                </a>
+            </p>
+        </div>
+
+        <!-- Role Access -->
+        <div class="border-b pb-4">
+            <h4 class="text-sm font-semibold text-gray-600 flex items-center gap-2">
+                <i data-lucide="key-round" class="w-4 h-4"></i>
+                Dapat Diakses oleh Peran
+            </h4>
+
+            <div class="mt-2 flex flex-wrap gap-2">
+                {{if or .Data.RoleNames .Data.PositionNames}}
+
+                    {{range .Data.RoleNames}}
+                        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-md shadow-sm text-sm capitalize">
+                            {{.}}
+                        </span>
+                    {{end}}
+
+                    {{range .Data.PositionNames}}
+                        <span class="bg-gray-100 text-gray-700 px-3 py-1 rounded-md shadow-sm text-sm capitalize">
+                            {{.}}
+                        </span>
+                    {{end}}
+
+                {{else}}
+                    <em class="text-gray-500">Tidak ada peran yang memiliki akses.</em>
+                {{end}}
+            </div>
+        </div>
+
     </div>
-    <div class="container">
-      <div class="detail-container">
-        <h3>Detail Aplikasi</h3>
-        <hr />
-        <div class="detail-item">
-          <label>Nama Aplikasi</label>
-          <p>{{.App.Name}}</p>
-        </div>
-        <div class="detail-item">
-          <label>Slug</label>
-          <p><code>{{.App.Slug}}</code></p>
-        </div>
-        <div class="detail-item">
-          <label>Target URL</label>
-          <p>{{.App.TargetURL}}</p>
-        </div>
-        <div class="detail-item">
-          <label>Dapat Diakses oleh Peran</label>
-          <p>
-            {{range $i, $role := .RoleNames}} {{if $i}}, {{end}}<span
-              style="text-transform: capitalize"
-              >{{$role}}</span
-            >
-            {{else}}
-            <em>Tidak ada peran yang memiliki akses.</em>
-            {{end}}
-          </p>
-        </div>
-        <a
-          href="/admin/applications"
-          class="btn btn-secondary"
-          style="margin-top: 20px"
-          >Kembali ke Daftar</a
-        >
-      </div>
+
+    <!-- Back Button -->
+    <div class="mt-8">
+        <a href="/admin/applications"
+           class="inline-flex items-center gap-2 bg-gray-700 hover:bg-gray-800 text-white px-4 py-2 rounded-md shadow-sm transition">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Kembali ke Daftar
+        </a>
     </div>
-  </body>
-</html>
+
+</div>
+
+{{end}}

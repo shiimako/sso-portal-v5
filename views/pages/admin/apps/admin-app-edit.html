@@ -1,115 +1,210 @@
-<!DOCTYPE html>
-<html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Edit Aplikasi - Admin SSO</title>
-    <style>
-      body {
-        font-family: sans-serif;
-        margin: 0;
-        background: #f8f9fa;
-      }
-      .container {
-        padding: 30px;
-        max-width: 700px;
-        margin: auto;
-      }
-      .form-group {
-        margin-bottom: 20px;
-      }
-      .form-group label {
-        font-weight: bold;
-        display: block;
-        margin-bottom: 5px;
-      }
-      .form-group input,
-      .form-group select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-      }
-      .checkbox-group {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .btn {
-        padding: 12px 20px;
-        border-radius: 5px;
-        border: none;
-        cursor: pointer;
-        color: #fff;
-      }
-      .btn-primary {
-        background: #007bff;
-      }
-      .btn-danger {
-        background: #dc3545;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">...</div>
-    <div class="container">
-      <div class="form-container">
-        <h3>Edit Aplikasi: {{.App.Name}}</h3>
-        <hr />
-        <form action="/admin/applications/update/{{.App.ID}}" method="POST">
-          <div class="form-group">
-            <label for="name">Nama Aplikasi</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value="{{.App.Name}}"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label for="slug">Slug</label>
-            <input
-              type="text"
-              id="slug"
-              name="slug"
-              value="{{.App.Slug}}"
-              required
-              pattern="[a-z0-9-]+"
-            />
-          </div>
-          <div class="form-group">
-            <label for="target_url">Target URL</label>
-            <input
-              type="url"
-              id="target_url"
-              name="target_url"
-              value="{{.App.TargetURL}}"
-              required
-            />
-          </div>
-          <div class="form-group">
-            <label>Hak Akses Peran</label>
-            <div class="checkbox-group">
-              {{range .AllRoles}}
-              <label>
-                <input
-                  type="checkbox"
-                  name="role_ids"
-                  value="{{.ID}}"
-                  {{if
-                  (index
-                  $.CurrentRoles
-                  .ID)}}checked{{end}}
-                />
-                {{.Name}} ({{.Type}})
-              </label>
-              {{end}}
-            </div>
-          </div>
+{{define "content"}}
 
-          <button type="submit" class="btn btn-primary">Update Aplikasi</button>
-        </form>
-      </div>
-    </div>
-  </body>
-</html>
+<div x-data="appEditForm({
+    name: '{{.Data.App.Name}}',
+    slug: '{{.Data.App.Slug}}',
+    currentIcon: '{{if .Data.App.IconURL.Valid}}{{.Data.App.IconURL.String}}{{end}}'
+})" class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-md">
+
+    <h2 class="text-2xl font-semibold mb-1 flex items-center gap-2">
+        <i data-lucide="pencil" class="w-6 h-6 text-gray-700"></i>
+        Edit Aplikasi
+    </h2>
+    <p class="text-gray-600 mb-6">Perbarui informasi aplikasi <b>{{.Data.App.Name}}</b>.</p>
+
+    <form action="/admin/applications/update/{{.Data.App.ID}}" method="POST" enctype="multipart/form-data" class="space-y-6">
+
+        <!-- Nama & Slug -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                    <i data-lucide="badge-info" class="w-4 h-4"></i>
+                    Nama Aplikasi
+                </label>
+                <input 
+                    type="text" 
+                    name="name" 
+                    x-model="name" 
+                    @input="generateSlug()"
+                    class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" 
+                    required 
+                />
+            </div>
+
+            <div>
+                <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                    <i data-lucide="hash" class="w-4 h-4"></i>
+                    Slug
+                </label>
+                <input 
+                    type="text" 
+                    name="slug" 
+                    x-model="slug"
+                    class="w-full p-3 border rounded-md bg-gray-50 text-gray-600" 
+                    required 
+                />
+                <p class="text-xs text-gray-500 mt-1">Mengubah slug dapat merusak link external.</p>
+            </div>
+        </div>
+
+        <!-- Deskripsi -->
+        <div>
+            <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                <i data-lucide="align-left" class="w-4 h-4"></i>
+                Deskripsi
+            </label>
+            <textarea name="description" class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" rows="3">{{.Data.App.Description}}</textarea>
+        </div>
+
+        <!-- Target URL -->
+        <div>
+            <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                <i data-lucide="link" class="w-4 h-4"></i>
+                Target URL
+            </label>
+            <input type="url" name="target_url" value="{{.Data.App.TargetURL}}" class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" required />
+        </div>
+
+        <!-- Icon Image -->
+        <div>
+            <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                <i data-lucide="image" class="w-4 h-4"></i>
+                Icon Aplikasi
+            </label>
+
+            <!-- Hidden input untuk menyimpan path lama jika user tidak upload baru -->
+            <input type="hidden" name="icon_url" value="{{if .Data.App.IconURL.Valid}}{{.Data.App.IconURL.String}}{{end}}">
+
+            <div class="flex items-start gap-4 mt-2">
+                <!-- Preview Box -->
+                <div class="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
+                    <template x-if="imageUrl">
+                        <img :src="imageUrl" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="!imageUrl">
+                        <span class="text-gray-400 text-xs text-center p-1">No Image</span>
+                    </template>
+                </div>
+
+                <div class="flex-1">
+                    <input 
+                        type="file" 
+                        name="icon_file" 
+                        accept=".png,.jpg,.jpeg,.svg" 
+                        @change="fileChosen"
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                    />
+                    <p class="text-sm text-gray-500 mt-2">Biarkan kosong jika tidak ingin mengubah icon.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Roles & Positions Checkbox -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Roles -->
+            <div class="bg-gray-50 p-4 rounded-lg border">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-semibold text-gray-700 flex items-center gap-2">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        Akses Peran
+                    </label>
+                    <button type="button" @click="toggleAllRoles()" class="text-xs text-blue-600 hover:underline">
+                        Pilih Semua
+                    </button>
+                </div>
+                
+                <div class="max-h-48 overflow-y-auto space-y-2 pr-2">
+                    {{range .Data.AllRoles}}
+                    <label class="flex items-center gap-2 bg-white px-3 py-2 rounded border cursor-pointer hover:bg-blue-50 transition">
+                        <!-- Perhatikan cara pengecekan 'checked' menggunakan index map -->
+                        <input type="checkbox" name="role_ids" value="{{.ID}}" 
+                               class="role-checkbox rounded text-blue-600"
+                               {{if index $.Data.CurrentRoles .ID}}checked{{end}} />
+                        <span class="text-sm">{{.Name}}</span>
+                    </label>
+                    {{end}}
+                </div>
+            </div>
+
+            <!-- Positions -->
+            <div class="bg-gray-50 p-4 rounded-lg border">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-semibold text-gray-700 flex items-center gap-2">
+                        <i data-lucide="briefcase" class="w-4 h-4"></i>
+                        Akses Jabatan
+                    </label>
+                    <button type="button" @click="toggleAllPositions()" class="text-xs text-blue-600 hover:underline">
+                        Pilih Semua
+                    </button>
+                </div>
+
+                <div class="max-h-48 overflow-y-auto space-y-2 pr-2">
+                    {{range .Data.AllPositions}}
+                    <label class="flex items-center gap-2 bg-white px-3 py-2 rounded border cursor-pointer hover:bg-blue-50 transition">
+                        <input type="checkbox" name="position_ids" value="{{.ID}}" 
+                               class="position-checkbox rounded text-blue-600"
+                               {{if index $.Data.CurrentPositions .ID}}checked{{end}} />
+                        <span class="text-sm">{{.Name}}</span>
+                    </label>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="pt-4 border-t flex justify-between items-center">
+            <a href="/admin/applications" class="text-gray-600 hover:text-gray-900 text-sm flex items-center gap-2">
+                Batal
+            </a>
+
+            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md shadow flex items-center gap-2 transition">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                Simpan Perubahan
+            </button>
+        </div>
+
+    </form>
+</div>
+
+<script>
+    function appEditForm(initialData) {
+        return {
+            name: initialData.name,
+            slug: initialData.slug,
+            imageUrl: initialData.currentIcon,
+
+            generateSlug() {
+                this.slug = this.name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, '') 
+                    .trim()
+                    .replace(/\s+/g, '-')         
+                    .replace(/-+/g, '-');         
+            },
+
+            fileChosen(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    this.imageUrl = URL.createObjectURL(file);
+                }
+            },
+
+            toggleAllRoles() {
+                const checkboxes = document.querySelectorAll('.role-checkbox');
+                // Konversi NodeList ke Array biar aman
+                const arr = Array.from(checkboxes);
+                const allChecked = arr.every(c => c.checked);
+                arr.forEach(c => c.checked = !allChecked);
+            },
+
+            toggleAllPositions() {
+                const checkboxes = document.querySelectorAll('.position-checkbox');
+                const arr = Array.from(checkboxes);
+                const allChecked = arr.every(c => c.checked);
+                arr.forEach(c => c.checked = !allChecked);
+            }
+        }
+    }
+</script>
+
+{{end}}

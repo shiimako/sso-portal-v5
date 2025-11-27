@@ -1,0 +1,17 @@
+{{define "header"}}
+<div class="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+    <h2 class="text-xl font-semibold">{{.HeaderTitle}}</h2>
+
+    <div class="relative" x-data="{ open:false }">
+        <button @click="open = !open" class="flex items-center gap-2 text-sm px-3 py-1 rounded hover:bg-gray-100">
+            <img src="/avatar/{{.UserLogin.ID}}" class="w-8 h-8 rounded-full object-cover border">
+            <span class="font-medium">{{.UserLogin.Name}} ({{.ActiveRole}})</span>
+        </button>
+
+        <div x-show="open" x-cloak @click.outside="open=false" class="absolute right-0 mt-2 bg-white border rounded shadow py-2 text-sm">
+            <a href="/profile/edit" class="block px-4 py-2 hover:bg-gray-100">Edit Profil</a>
+            <a href="/logout" class="block px-4 py-2 text-red-600 hover:bg-gray-100">Logout</a>
+        </div>
+    </div>
+</div>
+{{end}}
