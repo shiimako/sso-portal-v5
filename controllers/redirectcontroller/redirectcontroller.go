@@ -3,8 +3,9 @@ package redirectcontroller
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
-	"sso-portal-v3/handlers"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
 	"sso-portal-v3/views"
 	"time"
@@ -13,11 +14,11 @@ import (
 )
 
 type RedirectController struct {
-	env   *handlers.Env
+	env   *config.Env
 	views *views.Views
 }
 
-func NewRedirectController(env *handlers.Env, v *views.Views) *RedirectController {
+func NewRedirectController(env *config.Env, v *views.Views) *RedirectController {
 	return &RedirectController{env: env, views: v}
 }
 
@@ -68,18 +69,18 @@ func (rc *RedirectController) RedirectToApp(w http.ResponseWriter, r *http.Reque
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
 			Subject:   fmt.Sprintf("%d", user.ID),
-			Issuer:    "SSO-PNC",
+			Issuer:   config.Issuer,
+			Audience:  jwt.ClaimStrings{appSlug},
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 
-	jwtSecret := os.Getenv("JWT_SECRET_KEY")
-	tokenString, err := token.SignedString([]byte(jwtSecret))
+	tokenString, err := token.SignedString(config.PrivateKey)
 	if err != nil {
 		http.Error(w, "Gagal membuat token", http.StatusInternalServerError)
 		return
 	}
-	finalURL := fmt.Sprintf("%s?token=%s", app.TargetURL, tokenString)
+	finalURL := fmt.Sprintf("%s?token=%s", app.TargetURL, url.QueryEscape(tokenString))
 	http.Redirect(w, r, finalURL, http.StatusTemporaryRedirect)
 }

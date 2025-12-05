@@ -4,8 +4,6 @@ package models
 
 import (
 	"database/sql"
-	"strconv"
-	"strings"
 
 	"github.com/jmoiron/sqlx"
 )
@@ -19,9 +17,6 @@ type Application struct {
 	TargetURL   string         `db:"target_url"`
 	IconURL     sql.NullString `db:"icon_url"`
 }
-
-var cacheRoleApps = map[string][]Application{}
-var cachePosApps = map[string][]Application{}
 
 // GetAllApplications mengambil semua data aplikasi dari database.
 func GetAllApplications(db *sqlx.DB, page int, pagesize int, search string) ([]Application, error) {
@@ -211,9 +206,6 @@ func UpdateApplication(db *sqlx.DB, id, name, description, slug, targetURL, icon
 		return err
 	}
 
-	cacheRoleApps = map[string][]Application{}
-	cachePosApps = map[string][]Application{}
-
 	return nil
 }
 
@@ -223,9 +215,6 @@ func DeleteApplication(db *sqlx.DB, id string) error {
 	if err != nil {
 		return err
 	}
-
-	cacheRoleApps = map[string][]Application{}
-	cachePosApps = map[string][]Application{}
 
 	return nil
 }
@@ -238,59 +227,44 @@ func FindApplicationBySlug(db *sqlx.DB, slug string) (Application, error) {
 	return app, err
 }
 
-func FindApplicationsByRole(db *sqlx.DB, roleName string) ([]Application, error) {
+// FindAccessibleApps mengambil aplikasi yang dapat diakses berdasarkan role dan posisi.
+func FindAccessibleApps(db *sqlx.DB, roleName string, positionIDs []int) ([]Application, error) {
+    
+    // TRICK: Handle Empty Slice
+    // sqlx.In akan error jika slice kosong. 
+    // Jadi jika kosong, kita isi string kosong "" agar query menjadi: IN ('')
+    // Ini aman karena tidak ada position_name yang namanya kosong.
+    if len(positionIDs) == 0 {
+        positionIDs = []int{0}
+    }
 
-	if apps, ok := cacheRoleApps[roleName]; ok {
-		return apps, nil
-	}
+    query := `
+    -- Bagian 1: Ambil Apps berdasarkan ROLE (Admin/Mhs/Dosen)
+    SELECT a.id, a.name, a.description, a.slug, a.target_url, a.icon_url
+    FROM applications a
+    JOIN application_role_access ara ON a.id = ara.application_id
+    JOIN roles r ON ara.role_id = r.id
+    WHERE r.role_name = ?
+    
+    UNION
 
-	var apps []Application
-	query := `
-	SELECT a.id, a.name, a.description, a.slug, a.target_url, a.icon_url
-	FROM applications a
-	JOIN application_role_access aa ON a.id = aa.application_id
-	JOIN roles r ON aa.role_id = r.id
-	WHERE r.role_name = ?`
-	err := db.Select(&apps, query, roleName)
-	return apps, err
-}
+    -- Bagian 2: Ambil Apps berdasarkan POSITION (untuk Dosen)
+    SELECT a.id, a.name, a.description, a.slug, a.target_url, a.icon_url
+    FROM applications a
+    JOIN application_position_access apa ON a.id = apa.application_id
+    WHERE apa.position_id IN (?)
+    `
 
-func FindApplicationsByPositions(db *sqlx.DB, positionIDs []int) ([]Application, error) {
-
-	if len(positionIDs) == 0 {
-		return []Application{}, nil
-	}
-
-	key := sliceKey(positionIDs)
-
-	if apps, ok := cachePosApps[key]; ok {
-		return apps, nil
-	}
-
-	var apps []Application
-	query := `
-	SELECT DISTINCT a.id, a.name, a.description, a.slug, a.target_url, a.icon_url
-	FROM applications a
-	JOIN application_position_access aa ON a.id = aa.application_id
-	WHERE aa.position_id IN (?)`
-	query, args, err := sqlx.In(query, positionIDs)
-	if err != nil {
-		return nil, err
-	}
-	query = db.Rebind(query)
-	err = db.Select(&apps, query, args...)
-	if err != nil {
-		return nil, err
-	}
-	cachePosApps[key] = apps
-
-	return apps, nil
-}
-
-func sliceKey(ints []int) string {
-	key := make([]string, len(ints))
-	for i, v := range ints {
-		key[i] = strconv.Itoa(v)
-	}
-	return strings.Join(key, ",")
+    // Proses Query
+    query, args, err := sqlx.In(query, roleName, positionIDs)
+    if err != nil {
+        return nil, err
+    }
+    
+    query = db.Rebind(query)
+    
+    var apps []Application
+    err = db.Select(&apps, query, args...)
+    
+    return apps, err
 }

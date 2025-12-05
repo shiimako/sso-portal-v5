@@ -11,7 +11,6 @@ import (
 	"sso-portal-v3/controllers/dashboardcontroller"
 	"sso-portal-v3/controllers/redirectcontroller"
 	"sso-portal-v3/controllers/usercontroller"
-	"sso-portal-v3/handlers"
 	"sso-portal-v3/middleware"
 	"sso-portal-v3/views"
 
@@ -47,7 +46,7 @@ func main() {
 	}
 
 	// Inisialisasi environment untuk handler
-	env := &handlers.Env{
+	env := &config.Env{
 		DB:          db,
 		Store:       sessionStore,
 		Templates:   templates,
@@ -60,6 +59,11 @@ func main() {
 	// Inisialisasi Google OAuth2 config
 	oauthConfig := config.InitGoogleOAuthConfig(env.BaseURL)
 	env.GoogleOAuthConfig = oauthConfig
+
+	// Load RSA keys untuk JWT
+	if err := config.LoadKeys(); err != nil {
+    log.Fatalf("Gagal memuat RSA keys: %v", err)
+	}
 
 	// Inisialisasi controller
 	authCtrl := authcontroller.NewAuthController(env)
@@ -128,6 +132,12 @@ func main() {
 	adminRouter.HandleFunc("/applications/edit/{id}", adminCtrl.EditApplicationForm).Methods("GET")
 	adminRouter.HandleFunc("/applications/update/{id}", adminCtrl.UpdateApplication).Methods("POST")
 	adminRouter.HandleFunc("/applications/delete/{id}", adminCtrl.DeleteApplication).Methods("POST")
+
+	// ===================================
+	// LOG MANAGEMENT
+	// ====================================
+	adminRouter.HandleFunc("/sync/stream", adminCtrl.StreamUserSync).Methods("GET")
+	adminRouter.HandleFunc("/sync-logs", adminCtrl.SyncLogsPage).Methods("GET")
 
 	port := os.Getenv("PORT")
 	log.Printf("Server berjalan di http://localhost:%s", port)

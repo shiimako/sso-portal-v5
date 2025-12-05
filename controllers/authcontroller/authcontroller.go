@@ -8,16 +8,16 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sso-portal-v3/handlers"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
 	"strings"
 )
 
 type AuthController struct {
-	env *handlers.Env
+	env *config.Env
 }
 
-func NewAuthController(env *handlers.Env) *AuthController {
+func NewAuthController(env *config.Env) *AuthController {
 	return &AuthController{env: env}
 }
 
@@ -160,8 +160,8 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 
 	if user.Avatar.Valid {
 		session.Values["avatar"] = user.Avatar.String
-	}else{
-	session.Values["avatar"] = userProfile.Picture
+	} else {
+		session.Values["avatar"] = userProfile.Picture
 	}
 
 	delete(session.Values, "state")
@@ -171,9 +171,9 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 		session.Save(r, w)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
-	} 
-		session.Save(r, w)
-		http.Redirect(w, r, "/dashboard", http.StatusFound)
+	}
+	session.Save(r, w)
+	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
 
 // Logout menghapus session pengguna

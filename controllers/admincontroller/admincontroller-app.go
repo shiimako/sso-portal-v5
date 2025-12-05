@@ -133,7 +133,7 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 	description := r.FormValue("description")
 	slug := r.FormValue("slug")
 	targetURL := r.FormValue("target_url")
-	iconURL := "/public/uploads/icons/default.png"
+	iconURL := "/uploads/icons/default.png"
 
 	// Ambil array checkbox
 	roleIDs := r.Form["role_ids"]
@@ -152,7 +152,7 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 	}
 
 	// Handle File Upload
-	file, header, err := r.FormFile("icon_file")
+	file, header, err := r.FormFile("icon-file")
 	if err == nil {
 		defer file.Close()
 
@@ -170,7 +170,7 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 		// Buat filename aman: app_{slug}_icon.png
 		// Replace spasi di slug jaga-jaga kalau client-side JS dimatikan user
 		safeSlug := strings.ReplaceAll(slug, " ", "-")
-		filename := fmt.Sprintf("app_%s_icon%s", safeSlug, ext)
+		filename := fmt.Sprintf("app-%s-icon%s", safeSlug, ext)
 
 		// Path penyimpanan
 		savePath := filepath.Join("public", "uploads", "icons", filename)
@@ -289,7 +289,7 @@ func (ac *AdminController) UpdateApplication(w http.ResponseWriter, r *http.Requ
     }
 
     // 2. Handle File Upload (Jika ada file baru)
-    file, header, err := r.FormFile("icon_file")
+    file, header, err := r.FormFile("icon-file")
     if err == nil {
         defer file.Close()
 
@@ -303,7 +303,7 @@ func (ac *AdminController) UpdateApplication(w http.ResponseWriter, r *http.Requ
 
         // Buat nama file unik
         safeSlug := strings.ReplaceAll(slug, " ", "-")
-        filename := fmt.Sprintf("app_%s_icon%s", safeSlug, ext)
+        filename := fmt.Sprintf("app-%s-icon%s", safeSlug, ext)
         savePath := filepath.Join("public", "uploads", "icons", filename)
 
         // Pastikan folder ada

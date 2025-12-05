@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 	"path/filepath"
-	"sso-portal-v3/handlers"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
 	"strings"
 )
@@ -20,10 +20,10 @@ type ViewData struct {
 }
 
 type Views struct {
-	env       *handlers.Env
+	env *config.Env
 }
 
-func NewViews(env *handlers.Env) *Views {
+func NewViews(env *config.Env) *Views {
 	return &Views{env: env}
 }
 
@@ -104,16 +104,16 @@ func InitTemplates() (map[string]*template.Template, error) {
 
 func (v *Views) RenderPage(w http.ResponseWriter, r *http.Request, name string, pageData map[string]interface{}) {
 
-    userLogin := r.Context().Value("UserLogin").(*models.FullUser)
-    activeRole := userLogin.Roles[0].Name
+	userLogin := r.Context().Value("UserLogin").(*models.FullUser)
+	activeRole := userLogin.Roles[0].Name
 
-    data := ViewData{
-        UserLogin:   userLogin,
-        ActiveRole:  activeRole,
-        HeaderTitle: "PNC-Portal System",
-        Data:        pageData,
-    }
+	data := ViewData{
+		UserLogin:   userLogin,
+		ActiveRole:  activeRole,
+		HeaderTitle: "PNC-Portal System",
+		Data:        pageData,
+	}
 
-    tmpl := v.env.Templates[name]
-    tmpl.ExecuteTemplate(w, "base", data)
+	tmpl := v.env.Templates[name]
+	tmpl.ExecuteTemplate(w, "base", data)
 }

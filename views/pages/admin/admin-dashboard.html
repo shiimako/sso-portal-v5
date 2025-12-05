@@ -1,0 +1,65 @@
+{{define "content"}}
+
+<h3 class="text-xl font-semibold mb-2">Menu Utama</h3>
+<p class="text-gray-600 mb-6">
+    Pilih modul yang ingin Anda kelola.
+</p>
+
+<a href="/dashboard" class="text-gray-600 hover:text-gray-900 text-sm flex items-center gap-2">
+    <i data-lucide="arrow-left" class="w-4 h-4"></i>
+    Kembali ke Dashboard
+</a>
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+
+    <div class="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition flex flex-col relative overflow-hidden">
+        
+        {{if gt .Data.UnreadErrors 0}}
+        <div class="absolute top-0 right-0 bg-red-600 text-white text-xs font-bold px-3 py-1 rounded-bl-xl z-10">
+            {{.Data.UnreadErrors}} Error Sync
+        </div>
+        {{end}}
+
+        <h4 class="text-lg font-semibold mb-3 pb-2 border-b flex items-center gap-2">
+            <i data-lucide="users" class="w-5 h-5 text-gray-700"></i>
+            <span>Manajemen Pengguna</span>
+        </h4>
+        <p class="text-gray-600 text-sm mb-6 leading-relaxed flex-1">
+            Kelola data mahasiswa & dosen. Data terintegrasi dengan Data Center via Cron & Webhook.
+        </p>
+        
+        <div class="flex gap-3 mt-auto">
+            <a href="/admin/users"
+               class="flex-1 bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-lg text-sm font-medium text-center transition shadow-sm">
+                Kelola Data
+            </a>
+            
+            <a href="/admin/sync-logs"
+               title="Lihat Riwayat Sinkronisasi"
+               class="bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-2 rounded-lg text-sm border transition flex items-center justify-center relative">
+               <i data-lucide="history" class="w-5 h-5"></i>
+               
+               {{if gt .Data.UnreadErrors 0}}
+               <span class="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 border-2 border-white rounded-full"></span>
+               {{end}}
+            </a>
+        </div>
+    </div>
+
+    <div class="bg-white border rounded-xl p-6 shadow-sm hover:shadow-md transition flex flex-col">
+        <h4 class="text-lg font-semibold mb-3 pb-2 border-b flex items-center gap-2">
+            <i data-lucide="layout-grid" class="w-5 h-5 text-gray-700"></i>
+            <span>Manajemen Aplikasi</span>
+        </h4>
+        <p class="text-gray-600 text-sm mb-6 leading-relaxed flex-1">
+            Atur daftar aplikasi klien (URL, Icon, Deskripsi) yang tampil di Portal SSO.
+        </p>
+        <a href="/admin/applications"
+           class="bg-gray-900 hover:bg-black text-white px-4 py-2 rounded-lg text-sm font-medium text-center transition shadow-sm mt-auto">
+            Kelola Aplikasi
+        </a>
+    </div>
+
+</div>
+
+{{end}}

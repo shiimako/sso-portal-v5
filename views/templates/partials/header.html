@@ -1,16 +1,63 @@
 {{define "header"}}
-<div class="bg-white border-b px-6 py-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-    <h2 class="text-xl font-semibold">{{.HeaderTitle}}</h2>
+<div class="bg-white/90 backdrop-blur-md border-b border-gray-200 px-6 py-3 flex justify-between items-center sticky top-0 z-50 shadow-sm transition-all duration-300">
+    
+    <div class="flex items-center gap-3">
+        <div class="bg-blue-50 p-2 rounded-lg text-blue-600 hidden sm:block">
+            <img src="/static/Logo-PNC.png" class="w-5 h-5 object-contain" alt="Logo PNC">
+        </div>
+        <h2 class="text-xl font-bold text-gray-800 tracking-tight">{{.HeaderTitle}}</h2>
+    </div>
 
-    <div class="relative" x-data="{ open:false }">
-        <button @click="open = !open" class="flex items-center gap-2 text-sm px-3 py-1 rounded hover:bg-gray-100">
-            <img src="/avatar/{{.UserLogin.ID}}" class="w-8 h-8 rounded-full object-cover border">
-            <span class="font-medium">{{.UserLogin.Name}} ({{.ActiveRole}})</span>
+    <div class="relative" x-data="{ open: false }">
+        <button 
+            @click="open = !open" 
+            class="flex items-center gap-3 group p-1.5 pr-3 rounded-full hover:bg-gray-100 transition-colors border border-transparent hover:border-gray-200"
+        >
+            <img 
+                src="/avatar/{{.UserLogin.ID}}" 
+                class="w-9 h-9 rounded-full object-cover border-2 border-white shadow-sm group-hover:shadow transition"
+                alt="Avatar"
+            >
+            
+            <div class="text-left hidden sm:block">
+                <p class="text-sm font-semibold text-gray-700 leading-none group-hover:text-gray-900">{{.UserLogin.Name}}</p>
+                <p class="text-[10px] uppercase font-bold text-blue-600 tracking-wider mt-0.5">{{.ActiveRole}}</p>
+            </div>
+
+            <i data-lucide="chevron-down" 
+               class="w-4 h-4 text-gray-400 transition-transform duration-200"
+               :class="open ? 'rotate-180 text-gray-600' : ''">
+            </i>
         </button>
 
-        <div x-show="open" x-cloak @click.outside="open=false" class="absolute right-0 mt-2 bg-white border rounded shadow py-2 text-sm">
-            <a href="/profile/edit" class="block px-4 py-2 hover:bg-gray-100">Edit Profil</a>
-            <a href="/logout" class="block px-4 py-2 text-red-600 hover:bg-gray-100">Logout</a>
+        <div 
+            x-show="open" 
+            x-cloak 
+            @click.outside="open = false"
+            x-transition:enter="transition ease-out duration-200"
+            x-transition:enter-start="opacity-0 translate-y-2"
+            x-transition:enter-end="opacity-100 translate-y-0"
+            x-transition:leave="transition ease-in duration-150"
+            x-transition:leave-start="opacity-100 translate-y-0"
+            x-transition:leave-end="opacity-0 translate-y-2"
+            class="absolute right-0 mt-3 w-56 bg-white border border-gray-100 rounded-xl shadow-xl py-2 overflow-hidden ring-1 ring-black ring-opacity-5"
+        >
+            <div class="px-4 py-3 border-b border-gray-50 mb-1 sm:hidden">
+                 <p class="text-sm font-semibold text-gray-900">{{.UserLogin.Name}}</p>
+                 <p class="text-xs text-gray-500 capitalize">{{.ActiveRole}}</p>
+            </div>
+
+            <a href="/profile/edit" class="flex items-center gap-2 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 hover:text-blue-600 transition-colors">
+                <i data-lucide="user-pen" class="w-4 h-4"></i>
+                Edit Profil
+            </a>
+
+            <div class="border-t border-gray-100 my-1"></div>
+
+            <a href="/logout" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+                <i data-lucide="log-out" class="w-4 h-4"></i>
+                Keluar
+            </a>
         </div>
     </div>
 </div>

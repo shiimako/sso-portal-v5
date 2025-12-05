@@ -11,6 +11,8 @@
       src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"
     ></script>
 
+    <script src="https://unpkg.com/lucide@latest"></script>
+
     <style>
       [x-cloak] {
         display: none !important;
@@ -23,10 +25,9 @@
 
     <main class="p-6 max-w-6xl mx-auto">{{block "content" .}}{{end}}</main>
 
-    <script src="https://unpkg.com/lucide@latest"></script>
     <script>
       document.addEventListener("DOMContentLoaded", () => {
-        lucide.createIcons();
+          lucide.createIcons();
       });
     </script>
   </body>

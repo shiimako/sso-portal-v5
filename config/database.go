@@ -17,7 +17,7 @@ func InitDB() (*sqlx.DB, error) {
 	dbName := os.Getenv("DB_NAME")
 
 	// Bikin connection string MySQL (user:pass@tcp(host)/dbname)
-	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s", dbUser, dbPass, dbHost, dbName)
+	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true", dbUser, dbPass, dbHost, dbName)
 
 	db, err := sqlx.Open("mysql", dsn)
 	if err != nil {

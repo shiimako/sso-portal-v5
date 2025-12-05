@@ -4,11 +4,11 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"sso-portal-v3/handlers"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
 )
 
-func GlobalAuthMiddleware(env *handlers.Env) func(http.Handler) http.Handler {
+func GlobalAuthMiddleware(env *config.Env) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -44,7 +44,7 @@ func GlobalAuthMiddleware(env *handlers.Env) func(http.Handler) http.Handler {
 	}
 }
 
-func AdminMiddleware(env *handlers.Env) func(http.Handler) http.Handler {
+func AdminMiddleware(env *config.Env) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
@@ -73,4 +73,3 @@ func AdminMiddleware(env *handlers.Env) func(http.Handler) http.Handler {
 		})
 	}
 }
-

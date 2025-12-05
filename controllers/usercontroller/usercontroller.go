@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sso-portal-v3/handlers"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
 	"sso-portal-v3/views"
 	"strconv"
@@ -20,11 +20,11 @@ import (
 )
 
 type UserController struct {
-	env   *handlers.Env
+	env   *config.Env
 	views *views.Views
 }
 
-func NewUserController(env *handlers.Env, v *views.Views) *UserController {
+func NewUserController(env *config.Env, v *views.Views) *UserController {
 	return &UserController{env: env, views: v}
 }
 
@@ -60,7 +60,7 @@ func (uc *UserController) ShowProfileForm(w http.ResponseWriter, r *http.Request
 		"Profile": profile,
 	}
 
-	uc.views.RenderPage(w, r, "edit_profile", data)
+	uc.views.RenderPage(w, r, "edit-profile", data)
 }
 
 // HandleProfileUpdate memproses data form edit profil
@@ -75,7 +75,7 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 	// 2. Ambil data teks
 	address := r.FormValue("address")
 	phone := r.FormValue("phone")
-	avatarCropped := r.FormValue("avatar_cropped")
+	avatarCropped := r.FormValue("avatar-cropped")
 
 	var avatarPath string = ""
 	var saveDir = filepath.Join("public", "uploads", "avatars")
@@ -86,14 +86,12 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 	// SKENARIO A: Ada data crop (Base64) -> PRIORITAS UTAMA
 	// ---------------------------------------------------------
 	if avatarCropped != "" && strings.Contains(avatarCropped, "base64,") {
-		// Format biasanya: "data:image/jpeg;base64,/9j/4AAQSkZJRg..."
-		// Kita perlu memisahkan header "data:..." dengan konten aslinya
 		parts := strings.Split(avatarCropped, ",")
 		if len(parts) == 2 {
 			// Decode base64 string
 			dec, err := base64.StdEncoding.DecodeString(parts[1])
 			if err == nil {
-				fileName := fmt.Sprintf("user_%d_avatar_%d.jpg", userID, time.Now().UnixNano())
+				fileName := fmt.Sprintf("user-%d-avatar-%d.jpg", userID, time.Now().UnixNano())
 				savePath := filepath.Join(saveDir, fileName)
 
 				f, err := os.Create(savePath)
@@ -122,7 +120,7 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 
 			ext := filepath.Ext(header.Filename)
 			// Tambahkan timestamp agar browser tidak cache gambar lama
-			fileName := fmt.Sprintf("user_%d_avatar_%d%s", userID, time.Now().UnixNano(), ext)
+			fileName := fmt.Sprintf("user-%d-avatar-%d%s", userID, time.Now().UnixNano(), ext)
 			savePath := filepath.Join(saveDir, fileName)
 
 			dst, err := os.Create(savePath)
@@ -169,7 +167,7 @@ func (uc *UserController) ServeAvatar(w http.ResponseWriter, r *http.Request) {
 
 	user, err := models.FindUserByID(uc.env.DB, targetID)
 	if err != nil {
-		http.ServeFile(w, r, "./assets/default_avatar.png")
+		http.ServeFile(w, r, "./public/uploads/avatars/default.png")
 		return
 	}
 
@@ -185,12 +183,12 @@ func (uc *UserController) ServeAvatar(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		
-		http.ServeFile(w, r, "./public/static/default-avatar.png")
+
+		http.ServeFile(w, r, "./public/uploads/avatars/default.png")
 		return
 
-	} 
-	
+	}
+
 	if user.Avatar.String == user.GoogleAvatar.String {
 
 		resp, err := http.Get(user.GoogleAvatar.String)
@@ -203,11 +201,11 @@ func (uc *UserController) ServeAvatar(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uploadDir := "./public/uploads/avatars"
-	pattern := filepath.Join(uploadDir, fmt.Sprintf("user_%d_avatar_*.jpg", targetID))
+	pattern := filepath.Join(uploadDir, fmt.Sprintf("user-%d-avatar-*.jpg", targetID))
 
 	matches, err := filepath.Glob(pattern)
 	if err != nil || len(matches) == 0 {
-		http.ServeFile(w, r, "./public/static/default-avatar.png")
+		http.ServeFile(w, r, "./public/uploads/avatars/default.png")
 		return
 	}
 
