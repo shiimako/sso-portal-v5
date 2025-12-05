@@ -13,6 +13,9 @@ type User struct {
 	Email  string         `db:"email"`
 	Status string         `db:"status"`
 	Avatar sql.NullString `db:"avatar"`
+	GoogleAvatar sql.NullString `db: "googleavatar"`
+	Address sql.NullString `db:"address"`
+	Phone sql.NullString `db:"address"`
 }
 type UserRole struct {
 	RoleID int    `db:"role_id"`
@@ -34,11 +37,16 @@ type UserListItem struct {
 	Role   string         `db:"role"`
 }
 
+type AdminContact struct {
+	Phone string 
+	Email string
+}
+
 func FindUserByEmail(db *sqlx.DB, email string) (*FullUser, error) {
 
-	query := `SELECT u.id, u.name, u.email, u.status, u.avatar, 
+	query := `SELECT u.id, u.name, u.email, u.status, u.avatar, u.google_avatar, u.address, u.phone_number,
 	r.id AS role_id, 
-	r.name AS role_name 
+	r.role_name AS role_name 
 	FROM users u 
 	JOIN user_roles ur ON u.id = ur.user_id 
 	JOIN roles r ON ur.role_id = r.id 
@@ -55,6 +63,9 @@ func FindUserByEmail(db *sqlx.DB, email string) (*FullUser, error) {
 		&fu.Email,
 		&fu.Status,
 		&fu.Avatar,
+		&fu.GoogleAvatar,
+		&fu.Address,
+		&fu.Phone,
 		&role.RoleID,
 		&role.Name,
 	)
@@ -70,13 +81,13 @@ func FindUserByEmail(db *sqlx.DB, email string) (*FullUser, error) {
 	// Ambil data tambahan berdasarkan peran
 	if role.Name == "mahasiswa" {
 		var s Student
-		err := db.Get(&s, "SELECT id, user_id, nim, address, phone_number FROM students WHERE user_id = ?", fu.ID)
+		err := db.Get(&s, "SELECT id, user_id, nim FROM students WHERE user_id = ?", fu.ID)
 		if err == nil {
 			fu.Student = &s
 		}
 	} else if role.Name == "dosen" {
 		var l Lecturer
-		err := db.Get(&l, "SELECT id, user_id, nip, nuptk, address, phone_number FROM lecturers WHERE user_id = ?", fu.ID)
+		err := db.Get(&l, "SELECT id, user_id, nip, nuptk FROM lecturers WHERE user_id = ?", fu.ID)
 		if err == nil {
 			fu.Lecturer = &l
 		}
@@ -94,9 +105,9 @@ func FindUserByEmail(db *sqlx.DB, email string) (*FullUser, error) {
 
 func FindUserByID(db *sqlx.DB, id int) (*FullUser, error) {
 
-	query := `SELECT u.id, u.name, u.email, u.status, u.avatar, 
+	query := `SELECT u.id, u.name, u.email, u.status, u.avatar, u.google_avatar, u.address, u.phone_number,
 	r.id AS role_id, 
-	r.name AS role_name 
+	r.role_name AS role_name 
 	FROM users u 
 	JOIN user_roles ur ON u.id = ur.user_id 
 	JOIN roles r ON ur.role_id = r.id 
@@ -113,6 +124,9 @@ func FindUserByID(db *sqlx.DB, id int) (*FullUser, error) {
 		&fu.Email,
 		&fu.Status,
 		&fu.Avatar,
+		&fu.GoogleAvatar,
+		&fu.Address,
+		&fu.Phone,
 		&role.RoleID,
 		&role.Name,
 	)
@@ -128,13 +142,13 @@ func FindUserByID(db *sqlx.DB, id int) (*FullUser, error) {
 	// Ambil data tambahan berdasarkan peran
 	if role.Name == "mahasiswa" {
 		var s Student
-		err := db.Get(&s, "SELECT id, user_id, nim, address, phone_number FROM students WHERE user_id = ?", fu.ID)
+		err := db.Get(&s, "SELECT id, user_id, nim FROM students WHERE user_id = ?", fu.ID)
 		if err == nil {
 			fu.Student = &s
 		}
 	} else if role.Name == "dosen" {
 		var l Lecturer
-		err := db.Get(&l, "SELECT id, user_id, nip, nuptk, address, phone_number FROM lecturers WHERE user_id = ?", fu.ID)
+		err := db.Get(&l, "SELECT id, user_id, nip, nuptk FROM lecturers WHERE user_id = ?", fu.ID)
 		if err == nil {
 			fu.Lecturer = &l
 		}
@@ -151,8 +165,8 @@ func FindUserByID(db *sqlx.DB, id int) (*FullUser, error) {
 
 func UpdateUserAvatar(db *sqlx.DB, userID int, avatarURL string) error {
 	res, err := db.Exec(`
-        UPDATE users SET avatar = ?, updated_at = NOW() WHERE id = ?
-    `, avatarURL, userID)
+        UPDATE users SET avatar = ?, google_avatar = ?, updated_at = NOW() WHERE id = ?
+    `, avatarURL, avatarURL, userID)
 
 	if err != nil {
 		return err
@@ -169,17 +183,82 @@ func UpdateUserAvatar(db *sqlx.DB, userID int, avatarURL string) error {
 	return nil
 }
 
-func GetAllUsers(db *sqlx.DB) ([]UserListItem, error) {
-	query := `SELECT u.id, u.name, u.email, u.status, r.name AS role 
-	FROM users u 
-	JOIN user_roles ur ON ur.user_id = u.id 
-	JOIN roles r ON r.id = ur.role_id 
-	ORDER BY u.id DESC;`
-	
-	var users []UserListItem
-	err := db.Select(&users, query)
+func GetAllUsers(db *sqlx.DB, page, pagesize int, search, role string) ([]UserListItem, error) {
+
+    offset := (page - 1) * pagesize
+
+    query := `
+        SELECT 
+            u.id, 
+            u.name, 
+            u.email, 
+            u.status, 
+            r.role_name AS role
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        WHERE 1 = 1
+    `
+
+    args := []interface{}{}
+
+    if search != "" {
+        query += " AND u.name LIKE ? "
+        args = append(args, "%"+search+"%")
+    }
+
+    if role != "" {
+        query += " AND r.role_name = ? "
+        args = append(args, role)
+    }
+
+    query += `
+        ORDER BY u.id ASC
+        LIMIT ? OFFSET ?
+    `
+    args = append(args, pagesize, offset)
+
+    var users []UserListItem
+    err := db.Select(&users, query, args...)
+    if err != nil {
+        return nil, err
+    }
+
+    return users, nil
+}
+
+func UpdateUserProfile(db *sqlx.DB, userID int, address, phone, avatarPath string) error {
+	query := `UPDATE users SET address = ?, phone_number = ?, updated_at = NOW()`
+	args := []interface{}{address, phone}
+
+	if avatarPath != "" {
+		query += `, avatar = ?`
+		args = append(args, avatarPath)
+	}
+
+	query += ` WHERE id = ?`
+	args = append(args, userID)
+
+	_, err := db.Exec(query, args...)
+	return err
+}
+
+func GetAdminContact(db *sqlx.DB) (*AdminContact, error){
+
+	var contact AdminContact
+
+	query := `SELECT email, phone_number FROM users WHERE id = 1`
+	err := db.QueryRow(query).Scan(
+		&contact.Email,
+		&contact.Phone,
+	)
 	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return users, nil
+
+	return &contact, nil
 }
+

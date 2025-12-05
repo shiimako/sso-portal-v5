@@ -1,154 +1,304 @@
-<!DOCTYPE html>
-<html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Manajemen Pengguna - Admin SSO</title>
-    <style>
-      /* Menggunakan style yang sama dengan admin-dashboard */
-      body {
-        font-family: sans-serif;
-        margin: 0;
-        background-color: #f8f9fa;
-      }
-      .header {
-        background-color: #343a40;
-        color: white;
-        padding: 15px 30px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-      .header h2 {
-        margin: 0;
-      }
-      .logout-btn {
-        text-decoration: none;
-        padding: 8px 12px;
-        background-color: #dc3545;
-        color: white;
-        border-radius: 5px;
-        font-size: 14px;
-      }
-      .container {
-        padding: 30px;
-      }
-      .table {
-        width: 100%;
-        border-collapse: collapse;
-        background-color: white;
-      }
-      .table th,
-      .table td {
-        border: 1px solid #dee2e6;
-        padding: 12px;
-        text-align: left;
-      }
-      .table th {
-        background-color: #e9ecef;
-      }
-      .btn {
-        text-decoration: none;
-        padding: 6px 10px;
-        border-radius: 5px;
-        color: white;
-      }
-      .btn-edit {
-        background-color: #ffc107;
-      }
-      .btn-primary {
-        background-color: #007bff;
-      }
-      .btn-delete {
-        background-color: #dc3545;
-      }
-      .btn-add {
-        background-color: #007bff;
-        display: inline-block;
-        margin-bottom: 20px;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <h2>
-        <a href="/admin/dashboard" style="color: white; text-decoration: none"
-          >Admin SSO Portal</a
+{{define "content"}}
+<div x-data="userList()" class="space-y-6">
+  
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div>
+        <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <div class="p-2 bg-gray-100 rounded-lg">
+                <i data-lucide="users" class="w-5 h-5 text-gray-700"></i>
+            </div>
+            Manajemen Pengguna
+        </h3>
+        <p class="text-gray-500 text-sm mt-1">Total {{.Data.Total}} pengguna terdaftar dari Data Center.</p>
+    </div>
+
+    <div class="flex items-center gap-3">
+        <a href="/admin/sync-logs" class="text-gray-600 hover:text-gray-900 text-sm font-medium flex items-center gap-2 px-3 py-2 bg-white border rounded-lg shadow-sm hover:bg-gray-50 transition">
+            <i data-lucide="history" class="w-4 h-4"></i>
+            Log Sync
+        </a>
+
+        <button 
+            @click="modalConfirm = true"
+            class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-sm hover:shadow flex items-center gap-2 transition"
         >
-      </h2>
-      <a href="/admin/dashboard" class="logout-btn">Kembali</a>
+            <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+            Sync Ulang (Full)
+        </button>
     </div>
+  </div>
 
-    <div class="container">
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-        "
-      >
-        <h3>Manajemen Pengguna</h3>
-        <a href="/admin/users/new" class="btn btn-add">Tambah Pengguna Baru</a>
-      </div>
-      <hr />
+  <hr class="border-gray-200" />
 
-      {{if .Flashes}}
-      <div
-        class="alert alert-success"
-        style="
-          background: #d4edda;
-          padding: 10px;
-          border-radius: 5px;
-          color: #155724;
-        "
-      >
-        {{range .Flashes}}
-        <p>{{.}}</p>
-        {{end}}
-      </div>
-      {{end}}
+  <div class="flex flex-col sm:flex-row gap-4 w-full bg-gray-50 p-4 rounded-xl border border-gray-100">
+      <form method="GET" class="flex gap-3 w-full">
+        <div class="relative flex-1">
+            <i data-lucide="search" class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2"></i>
+            <input type="text" name="search" value="{{.Data.Search}}" placeholder="Cari nama atau email..." 
+                class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition" />
+        </div>
+        <select name="role" class="p-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 outline-none">
+            <option value="">Semua Peran</option>
+            <option value="admin" {{if eq .Data.Role "admin"}}selected{{end}}>Admin</option>
+            <option value="dosen" {{if eq .Data.Role "dosen"}}selected{{end}}>Dosen</option>
+            <option value="mahasiswa" {{if eq .Data.Role "mahasiswa"}}selected{{end}}>Mahasiswa</option>
+        </select>
+        <button class="bg-gray-800 hover:bg-black text-white px-5 py-2 rounded-lg font-medium flex items-center gap-2 transition">
+            <i data-lucide="filter" class="w-4 h-4"></i> Filter
+        </button>
+      </form>
+  </div>
 
-      <table class="table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Nama</th>
-            <th>Email</th>
-            <th>Status</th>
-            <th>Peran</th>
-            <th>Aksi</th>
-          </tr>
+  <div class="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-700 border-b">
+            <tr>
+                <th class="px-6 py-3 text-left font-semibold uppercase text-xs tracking-wider">Nama & Email</th>
+                <th class="px-6 py-3 text-left font-semibold uppercase text-xs tracking-wider">Role</th>
+                <th class="px-6 py-3 text-left font-semibold uppercase text-xs tracking-wider">Status</th>
+                <th class="px-6 py-3 text-right font-semibold uppercase text-xs tracking-wider">Aksi</th>
+            </tr>
         </thead>
-        <tbody>
-          {{range .Users}}
-          <tr>
-            <td>{{.ID}}</td>
-            <td>{{.Name}}</td>
-            <td>{{.Email}}</td>
-            <td>{{.Status}}</td>
-            <td>{{.Roles}}</td>
-            <td>
-              <a href="/admin/users/detail/{{.ID}}" class="btn btn-primary">Detail</a>
-              <a href="/admin/users/edit/{{.ID}}" class="btn btn-edit">Edit</a>
-              <form
-                action="/admin/users/delete/{{.ID}}"
-                method="POST"
-                style="display: inline"
-                onsubmit="return confirm('Apakah Anda yakin ingin menghapus pengguna ini? Data yang terhapus tidak dapat dikembalikan.');"
-              >
-                <button
-                  type="submit"
-                  class="btn btn-delete"
-                  style="cursor: pointer"
-                >
-                  Hapus
-                </button>
-              </form>
-            </td>
-          </tr>
-          {{end}}
+        <tbody class="divide-y divide-gray-100">
+            {{range .Data.Users}}
+            <tr class="hover:bg-gray-50 transition group">
+                <td class="px-6 py-4">
+                    <div class="font-medium text-gray-900">{{.Name}}</div>
+                    <div class="text-gray-500 text-xs">{{.Email}}</div>
+                </td>
+                <td class="px-6 py-4">
+                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                        {{if eq .Role "admin"}} bg-purple-100 text-purple-800 
+                        {{else if eq .Role "dosen"}} bg-blue-100 text-blue-800 
+                        {{else}} bg-green-100 text-green-800 {{end}} capitalize">
+                        {{.Role}}
+                    </span>
+                </td>
+                <td class="px-6 py-4">
+                    <div class="flex items-center gap-2">
+                         <span class="w-2 h-2 rounded-full {{if eq .Status "active"}}bg-green-500{{else}}bg-gray-400{{end}}"></span>
+                         <span class="capitalize text-gray-600">{{.Status}}</span>
+                    </div>
+                </td>
+                <td class="px-6 py-4 text-right">
+                    <div class="flex justify-end gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                         <a href="/admin/users/detail/{{.ID}}" class="text-gray-500 hover:text-blue-600 p-1 border rounded hover:bg-blue-50" title="Detail">
+                            <i data-lucide="eye" class="w-4 h-4"></i>
+                         </a>
+                         <button @click="showUnavailable()" class="text-gray-500 hover:text-yellow-600 p-1 border rounded hover:bg-yellow-50" title="Edit (Disabled)">
+                            <i data-lucide="pencil" class="w-4 h-4"></i>
+                         </button>
+                    </div>
+                </td>
+            </tr>
+            {{end}}
         </tbody>
-      </table>
+    </table>
+  </div>
+  
+  <div class="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4 text-sm text-gray-600">
+    <div class="flex items-center gap-2">
+        <span>Tampilkan</span>
+        <select x-model="limit" @change="updateLimit()" class="border border-gray-300 rounded px-2 py-1 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-500">
+            <option value="10">10</option>
+            <option value="25">25</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+        <span>data per halaman</span>
     </div>
-  </body>
-</html>
+
+    <div class="flex items-center gap-2">
+        <button @click="prevPage" :disabled="page <= 1" class="px-3 py-1 border rounded hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition">
+            <i data-lucide="chevron-left" class="w-4 h-4"></i>
+        </button>
+        <span>Halaman <span x-text="page" class="font-bold text-gray-900"></span></span>
+        <button @click="nextPage" class="px-3 py-1 border rounded hover:bg-gray-100 transition">
+            <i data-lucide="chevron-right" class="w-4 h-4"></i>
+        </button>
+    </div>
+  </div>
+
+  <div x-show="modalUnavailable" x-cloak class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+    <div class="bg-white rounded-xl shadow-xl p-6 max-w-sm w-full text-center" @click.outside="modalUnavailable=false">
+        <div class="mx-auto w-12 h-12 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center mb-4">
+            <i data-lucide="lock" class="w-6 h-6"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900">Akses Terbatas</h3>
+        <p class="text-gray-500 text-sm mt-2">
+            Data pengguna dikelola terpusat di Data Center. Silakan lakukan perubahan di sistem utama.
+        </p>
+        <button @click="modalUnavailable=false" class="mt-6 w-full bg-gray-900 text-white py-2 rounded-lg font-medium hover:bg-black transition">Mengerti</button>
+    </div>
+  </div>
+
+  <div x-show="modalConfirm" x-cloak class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 scale-95"
+       x-transition:enter-end="opacity-100 scale-100">
+      
+      <div class="bg-white w-full max-w-md rounded-xl shadow-2xl p-6 border border-gray-100" @click.outside="modalConfirm=false">
+          <div class="flex items-start gap-4">
+              <div class="p-3 bg-red-100 text-red-600 rounded-full shrink-0">
+                  <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+              </div>
+              <div>
+                  <h3 class="text-lg font-bold text-gray-900">Konfirmasi Sinkronisasi</h3>
+                  <p class="text-gray-500 text-sm mt-2 leading-relaxed">
+                      Tindakan ini akan <b>menghapus data lokal</b> dan mengambil ulang semua data dari Data Center. 
+                      Proses ini mungkin memakan waktu beberapa menit.
+                  </p>
+              </div>
+          </div>
+          
+          <div class="mt-6 flex justify-end gap-3">
+              <button @click="modalConfirm=false" class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition">
+                  Batal
+              </button>
+              <button @click="startSync()" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-sm transition flex items-center gap-2">
+                  Ya, Mulai Sync
+              </button>
+          </div>
+      </div>
+  </div>
+
+  <div x-show="showSync" x-cloak class="fixed inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div class="bg-white w-full max-w-lg rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+          
+          <div class="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+              <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                  <span x-show="!syncCompleted" class="animate-spin">⏳</span>
+                  <span x-show="syncCompleted">✅</span>
+                  <span x-text="syncCompleted ? 'Sinkronisasi Selesai' : 'Sedang Sinkronisasi...'"></span>
+              </h3>
+          </div>
+
+          <div class="p-6 space-y-6">
+              <div>
+                  <div class="flex justify-between text-sm font-medium mb-1">
+                      <span class="text-gray-600">Progress</span>
+                      <span class="text-indigo-600" x-text="syncProgress + '%'"></span>
+                  </div>
+                  <div class="w-full bg-gray-200 rounded-full h-4 overflow-hidden shadow-inner">
+                      <div class="bg-gradient-to-r from-indigo-500 to-purple-600 h-4 rounded-full transition-all duration-300 ease-out flex items-center justify-center"
+                           :style="`width: ${syncProgress}%`">
+                           <div class="w-full h-full opacity-30 bg-[white] bg-opacity-20 animate-pulse"></div>
+                      </div>
+                  </div>
+              </div>
+
+              <div class="bg-gray-900 rounded-lg p-4 font-mono text-xs h-48 overflow-y-auto border border-gray-700 shadow-inner custom-scrollbar">
+                  <template x-for="log in syncLogs">
+                      <div class="mb-1">
+                          <span class="text-green-400 mr-2">➜</span>
+                          <span class="text-gray-300" x-text="log"></span>
+                      </div>
+                  </template>
+                  <span x-show="!syncCompleted" class="inline-block w-2 h-4 bg-gray-400 animate-pulse align-middle"></span>
+              </div>
+          </div>
+
+          <div class="bg-gray-50 px-6 py-4 border-t flex justify-end">
+              <button x-show="syncCompleted" @click="finishSync()" 
+                  class="bg-gray-900 hover:bg-black text-white px-6 py-2 rounded-lg font-medium transition shadow-lg">
+                  Tutup & Refresh
+              </button>
+              <span x-show="!syncCompleted" class="text-xs text-gray-400 italic mt-2">Mohon jangan tutup halaman ini...</span>
+          </div>
+      </div>
+  </div>
+
+</div>
+
+<script>
+  function userList() {
+    return {
+      // Data standar
+      search: "",
+      filterRole: "",
+      
+      // Pagination Logic (ASLI)
+      page: Number("{{.Data.Page}}"),
+      limit: Number("{{.Data.Limit}}"),
+      
+      // Modal Logic
+      modalUnavailable: false,
+      modalConfirm: false,
+      
+      // Sync Logic
+      showSync: false,
+      syncProgress: 0,
+      syncCompleted: false,
+      syncLogs: [],
+
+      showUnavailable() {
+        this.modalUnavailable = true;
+      },
+
+      // --- LOGIKA REAL SSE SYNC ---
+      startSync() {
+          // 1. Tutup modal konfirmasi
+          this.modalConfirm = false;
+          
+          // 2. Buka modal progress
+          this.showSync = true;
+          this.syncProgress = 0;
+          this.syncCompleted = false;
+          this.syncLogs = ['Menghubungkan ke server...'];
+
+          // 3. Buka Koneksi Server-Sent Events (SSE)
+          const eventSource = new EventSource('/admin/sync/stream');
+
+          eventSource.onmessage = (event) => {
+              try {
+                  const data = JSON.parse(event.data);
+
+                  // Update UI
+                  if (data.log) this.syncLogs.push(data.log);
+                  if (data.progress) this.syncProgress = data.progress;
+
+                  // Auto scroll terminal
+                  this.$nextTick(() => {
+                      const terminal = document.querySelector('.custom-scrollbar');
+                      if(terminal) terminal.scrollTop = terminal.scrollHeight;
+                  });
+
+                  // Status: Selesai
+                  if (data.status === 'done') {
+                      this.syncCompleted = true;
+                      this.syncLogs.push('✨ Proses Selesai!');
+                      eventSource.close();
+                  }
+                  
+                  // Status: Error
+                  if (data.status === 'error') {
+                      this.syncLogs.push('❌ ERROR: ' + data.message);
+                      eventSource.close();
+                  }
+              } catch (e) {
+                  console.error("Error parsing SSE data:", e);
+              }
+          };
+
+          eventSource.onerror = () => {
+              if(!this.syncCompleted) {
+                this.syncLogs.push('⚠️ Koneksi terputus. Cek server logs.');
+              }
+              eventSource.close();
+          };
+      },
+
+      finishSync() {
+          this.showSync = false;
+          window.location.reload(); // Refresh halaman agar data baru termuat
+      },
+
+      // Pagination functions (REDIRECT URL)
+      updatePage() { window.location.href = `?page=${this.page}&limit=${this.limit}`; },
+      updateLimit() { this.page = 1; this.updatePage(); },
+      prevPage() { if(this.page > 1) { this.page--; this.updatePage(); } },
+      nextPage() { this.page++; this.updatePage(); },
+    };
+  }
+</script>
+{{end}}

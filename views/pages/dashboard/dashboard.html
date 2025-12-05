@@ -1,176 +1,190 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Dashboard - Portal SSO</title>
+{{define "content"}}
+<div x-data="dashboard()" class="min-h-screen bg-gray-50/50 pb-20">
 
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            background-color: #f5f7fa;
-            color: #333;
-        }
+  <div class="bg-gradient-to-r from-slate-800 to-gray-900 text-white pt-10 pb-20 px-6 sm:px-12 rounded-b-[2.5rem] shadow-lg mb-[-3rem]">
+    <div class="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+      <div>
+        <h1 class="text-3xl font-bold">Portal Aplikasi</h1>
+        <p class="text-gray-300 mt-1">Akses seluruh layanan dalam satu pintu.</p>
+      </div>
+      
+      {{if eq .ActiveRole "admin"}}
+      <a href="/admin/dashboard" 
+         class="flex items-center gap-2 bg-white/10 hover:bg-white/20 backdrop-blur-sm border border-white/20 text-white px-5 py-2.5 rounded-full transition font-medium text-sm">
+        <i data-lucide="shield-alert" class="w-4 h-4"></i>
+        Dashboard Admin
+      </a>
+      {{end}}
+    </div>
+  </div>
 
-        /* Header */
-        .header {
-            background-color: white;
-            padding: 15px 30px;
-            border-bottom: 1px solid #dcdcdc;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            position: sticky;
-            top: 0;
-            z-index: 10;
-        }
-
-        .header h2 {
-            margin: 0;
-            font-size: 22px;
-            color: #333;
-        }
-
-        .header-info {
-            font-size: 14px;
-        }
-
-        .header-info a {
-            color: #007bff;
-            text-decoration: none;
-            margin-left: 8px;
-        }
-
-        /* Buttons */
-        .logout-btn {
-            padding: 7px 12px;
-            background-color: #dc3545;
-            color: white !important;
-            border-radius: 6px;
-            font-size: 13px;
-            transition: background 0.2s ease;
-        }
-
-        .logout-btn:hover {
-            background-color: #b52c38;
-        }
-
-        /* Container */
-        .container {
-            padding: 30px;
-        }
-
-        h3 {
-            margin-top: 0;
-        }
-
-        /* Grid App Cards */
-        .app-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-            gap: 20px;
-            margin-top: 25px;
-        }
-
-        .app-card {
-            background-color: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0px 3px 8px rgba(0, 0, 0, 0.06);
-            border: 1px solid #e0e0e0;
-            transition: transform 0.15s ease, box-shadow 0.15s ease;
-        }
-
-        .app-card:hover {
-            transform: translateY(-3px);
-            box-shadow: 0px 5px 14px rgba(0, 0, 0, 0.1);
-        }
-
-        .app-card h3 {
-            margin: 0 0 10px 0;
-            color: #333;
-            font-size: 18px;
-        }
-
-        .app-card p {
-            font-size: 13px;
-            color: #666;
-            margin-bottom: 15px;
-        }
-
-        .app-card a {
-            display: inline-block;
-            padding: 8px 12px;
-            background-color: #28a745;
-            color: white;
-            text-decoration: none;
-            border-radius: 6px;
-            font-size: 13px;
-            transition: background 0.2s ease;
-        }
-
-        .app-card a:hover {
-            background-color: #218838;
-        }
-
-        /* Admin button */
-        .admin-btn {
-            padding: 10px 16px;
-            background-color: #007bff;
-            color: white !important;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 14px;
-            margin-bottom: 10px;
-            display: inline-block;
-        }
-
-        .admin-btn:hover {
-            background-color: #0069d9;
-        }
-
-    </style>
-</head>
-
-<body>
-
-    <!-- Header -->
-    <div class="header">
-        <h2>Portal SSO</h2>
-
-        <div class="header-info">
-            {{.UserName}} (Aktif: <b>{{.ActiveRole}}</b>)
-            <a href="/profile/edit">Edit Profil</a>
-            <a href="/logout" class="logout-btn">Logout</a>
-        </div>
+  <div class="px-6 max-w-6xl mx-auto relative z-10">
+    
+    <div class="bg-white p-2 rounded-2xl shadow-lg border border-gray-100 mb-8 flex items-center max-w-2xl mx-auto">
+      <div class="pl-4 text-gray-400">
+        <i data-lucide="search" class="w-5 h-5"></i>
+      </div>
+      <input
+        type="text"
+        placeholder="Cari aplikasi (contoh: Presensi, E-Learning)..."
+        class="w-full p-3 bg-transparent border-none focus:ring-0 text-gray-700 placeholder-gray-400 outline-none"
+        x-model="search"
+      />
     </div>
 
-    <!-- Content -->
-    <div class="container">
-        <h3>Aplikasi yang Tersedia (Peran: {{.ActiveRole}})</h3>
-        <hr />
-
-        <!-- Admin special button -->
-        {{if eq .ActiveRole "admin"}}
-        <a href="/admin/dashboard" class="admin-btn">Buka Dashboard Admin</a>
-        {{end}}
-
-        <!-- App List -->
-        {{if .Apps}}
-        <div class="app-grid">
-            {{range .Apps}}
-            <div class="app-card">
-                <h3>{{.Name}}</h3>
-                <p>Akses sistem {{.Name}} melalui tombol berikut:</p>
-                <a href="/redirect?app={{.Slug}}">Masuk</a>
-            </div>
-            {{end}}
+    <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-6">
+      {{range .Data.Apps}}
+      <div
+        class="group bg-white p-6 rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 cursor-pointer transition-all duration-300 transform hover:-translate-y-1"
+        @click="openApp('{{.Slug}}')"
+        x-show="matches('{{.Slug}}', '{{.Name}}')"
+      >
+        <div class="flex justify-center mb-4 transition-transform group-hover:scale-110 duration-300">
+          <div class="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center p-2 shadow-inner">
+             <img
+              src="{{if .IconURL.String}}{{.IconURL.String}}{{else}}/static/default-app.png{{end}}"
+              class="w-full h-full object-contain"
+            />
+          </div>
         </div>
-        {{else}}
-        <p>Tidak ada aplikasi yang tersedia untuk peran Anda saat ini.</p>
-        {{end}}
+
+        <div class="text-center">
+            <h4 class="font-bold text-gray-800 text-sm sm:text-base line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+                {{.Name}}
+            </h4>
+        </div>
+
+        <template x-init="apps['{{.Slug}}'] = {
+            name: '{{js .Name}}',
+            slug: '{{.Slug}}',
+            description: '{{js .Description}}',
+            target: '/redirect?app={{.Slug}}',
+            icon: '{{if .IconURL.String}}{{.IconURL.String}}{{else}}/static/default-app.png{{end}}'
+        }"></template>
+      </div>
+      {{end}}
     </div>
 
-</body>
-</html>
+    <div x-show="Object.keys(apps).length > 0 && $el.previousElementSibling.children.length > 0 && document.querySelectorAll('[x-show=\'matches\']').length === 0" 
+         class="text-center py-12 text-gray-500 hidden" :class="{'block': true}">
+        <i data-lucide="frown" class="w-12 h-12 mx-auto mb-2 text-gray-300"></i>
+        <p>Aplikasi tidak ditemukan.</p>
+    </div>
+  </div>
+
+  <div
+    x-show="show"
+    class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900/60 backdrop-blur-sm"
+    x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0"
+    x-transition:enter-end="opacity-100"
+    x-transition:leave="transition ease-in duration-200"
+    x-transition:leave-start="opacity-100"
+    x-transition:leave-end="opacity-0"
+    x-cloak
+  >
+    <div
+      class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden transform transition-all"
+      @click.outside="show=false"
+      x-transition:enter="transition ease-out duration-300"
+      x-transition:enter-start="opacity-0 translate-y-4 scale-95"
+      x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+      x-transition:leave="transition ease-in duration-200"
+      x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+      x-transition:leave-end="opacity-0 translate-y-4 scale-95"
+    >
+      <div class="bg-gray-50 p-6 border-b flex items-start gap-5">
+        <img :src="selected.icon" class="w-20 h-20 rounded-xl object-contain bg-white shadow-sm border p-1" />
+        <div class="flex-1">
+          <h2 class="text-xl font-bold text-gray-900 leading-tight" x-text="selected.name"></h2>
+          <span class="inline-block mt-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-semibold rounded" x-text="selected.slug"></span>
+        </div>
+        <button @click="show=false" class="text-gray-400 hover:text-gray-600 transition">
+            <i data-lucide="x" class="w-6 h-6"></i>
+        </button>
+      </div>
+
+      <div class="p-6">
+        <h5 class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">Deskripsi</h5>
+        <p class="text-gray-700 leading-relaxed" x-text="selected.description || 'Tidak ada deskripsi tersedia.'"></p>
+
+        <div class="mt-8 flex gap-3">
+            <button class="flex-1 px-4 py-2.5 rounded-xl border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 transition" @click="show=false">
+              Batal
+            </button>
+            <a :href="selected.target" class="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl font-bold shadow-lg shadow-blue-200 transition transform active:scale-95">
+              Buka Aplikasi
+              <i data-lucide="external-link" class="w-4 h-4"></i>
+            </a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="fixed bottom-8 right-8 z-40" x-data="{ fab: false }">
+    
+    <div
+      class="absolute bottom-20 right-0 flex flex-col items-end gap-3 min-w-[200px]"
+      x-show="fab"
+      x-transition:enter="transition ease-out duration-200"
+      x-transition:enter-start="opacity-0 translate-y-4"
+      x-transition:enter-end="opacity-100 translate-y-0"
+      x-transition:leave="transition ease-in duration-150"
+      x-transition:leave-start="opacity-100 translate-y-0"
+      x-transition:leave-end="opacity-0 translate-y-4"
+      style="display: none;" 
+    >
+      <a href="mailto:{{.Data.Admin.Email}}" class="group flex items-center gap-3">
+        <span class="bg-white text-gray-700 px-3 py-1.5 rounded-lg shadow-sm text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+            Email Admin
+        </span>
+        <div class="w-10 h-10 bg-red-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-red-600 transition">
+            <i data-lucide="mail" class="w-5 h-5"></i>
+        </div>
+      </a>
+
+      <a href="https://wa.me/{{.Data.Admin.Phone}}" class="group flex items-center gap-3">
+        <span class="bg-white text-gray-700 px-3 py-1.5 rounded-lg shadow-sm text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+            Chat WhatsApp
+        </span>
+        <div class="w-10 h-10 bg-green-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-green-600 transition">
+            <i data-lucide="message-circle" class="w-5 h-5"></i>
+        </div>
+      </a>
+    </div>
+
+    <button
+      @click="fab = !fab"
+      @click.outside="fab = false"
+      class="w-14 h-14 bg-gray-900 text-white rounded-full shadow-xl shadow-gray-400/50 flex items-center justify-center hover:bg-black transition transform active:scale-95 border-2 border-white/20"
+    >
+      <i data-lucide="plus" class="w-7 h-7 transition-transform duration-300" :class="fab ? 'rotate-[135deg]' : ''"></i>
+    </button>
+  </div>
+
+  <script>
+    function dashboard() {
+      return {
+        search: "",
+        show: false,
+        selected: {},
+        apps: {},
+
+        matches(slug, name) {
+          if(!this.search) return true;
+          let q = this.search.toLowerCase();
+          return (
+            slug.toLowerCase().includes(q) || name.toLowerCase().includes(q)
+          );
+        },
+
+        openApp(slug) {
+          this.selected = this.apps[slug];
+          this.show = true;
+        },
+      };
+    }
+  </script>
+</div>
+
+{{end}}

@@ -11,8 +11,6 @@ type Lecturer struct {
 	UserID  int            `db:"user_id"`
 	NIP     sql.NullString `db:"nip"`
 	NUPTK   sql.NullString `db:"nuptk"`
-	Address sql.NullString `db:"address"`
-	Phone   sql.NullString `db:"phone_number"`
 }
 
 type LecturerPosition struct {
@@ -32,13 +30,13 @@ type LecturerPositionDetail struct {
 
 func GetLecturerPositionsByLecturerID(db *sqlx.DB, lecturerID int) ([]LecturerPositionDetail, error) {
 	query := `SELECT 
-    p.name AS position_name,
+    p.position_name AS positionname,
     CASE 
         WHEN lp.major_id IS NOT NULL THEN 'major'
         WHEN lp.study_program_id IS NOT NULL THEN 'prodi'
         ELSE 'none'
-    END AS scope_type,
-    COALESCE(m.name, sp.name) AS scope_name 
+    END AS scopetype,
+    COALESCE(m.major_name, sp.study_program_name) AS scopename 
 	FROM lecturer_positions lp 
 	JOIN positions p ON lp.position_id = p.id 
 	LEFT JOIN majors m ON lp.major_id = m.id 
@@ -52,3 +50,4 @@ func GetLecturerPositionsByLecturerID(db *sqlx.DB, lecturerID int) ([]LecturerPo
 	}
 	return positions, nil
 }
+

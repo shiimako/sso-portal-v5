@@ -1,125 +1,211 @@
-<!DOCTYPE html>
-<html lang="id">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Tambah Aplikasi Baru - Admin SSO</title>
-    <style>
-      /* Menggunakan style yang sama dengan form user */
-      body {
-        font-family: sans-serif;
-        margin: 0;
-        background-color: #f8f9fa;
-      }
-      .header {
-        background-color: #343a40;
-        color: white;
-        padding: 15px 30px;
-      }
-      .container {
-        padding: 30px;
-      }
-      .form-container {
-        background-color: white;
-        padding: 30px;
-        border-radius: 8px;
-        max-width: 700px;
-        margin: auto;
-      }
-      .form-group {
-        margin-bottom: 20px;
-      }
-      .form-group label {
-        display: block;
-        margin-bottom: 5px;
-        font-weight: bold;
-      }
-      .form-group input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        box-sizing: border-box;
-      }
-      .checkbox-group {
-        border: 1px solid #eee;
-        padding: 15px;
-        border-radius: 5px;
-      }
-      .checkbox-group label {
-        font-weight: normal;
-        margin-right: 15px;
-      }
-      .btn {
-        text-decoration: none;
-        padding: 12px 20px;
-        border-radius: 5px;
-        color: white;
-        border: none;
-        cursor: pointer;
-      }
-      .btn-primary {
-        background-color: #007bff;
-      }
-      .btn-danger {
-        background-color: #dc3545;
-      }
-    </style>
-  </head>
-  <body>
-    <div class="header">
-      <h2>
-        <a href="/admin/dashboard" style="color: white; text-decoration: none"
-          >Admin SSO Portal</a
-        >
-      </h2>
-      <div>
-      <a href="/admin/applications" class="btn btn-danger">Kembali</a>
-      </div>
-    </div>
+{{define "content"}}
 
-    <div class="container">
-      <div class="form-container">
-        <h3>Form Tambah Aplikasi Baru</h3>
-        <hr />
-        <form action="/admin/applications/create" method="POST">
-          <div class="form-group">
-            <label for="name">Nama Aplikasi</label>
-            <input type="text" id="name" name="name" required />
-          </div>
-          <div class="form-group">
-            <label for="slug"
-              >Slug (pengenal unik, huruf kecil, tanpa spasi)</label
-            >
-            <input
-              type="text"
-              id="slug"
-              name="slug"
-              required
-              pattern="[a-z0-9-]+"
-            />
-          </div>
-          <div class="form-group">
-            <label for="target_url"
-              >Target URL (alamat redirect setelah login)</label
-            >
-            <input type="url" id="target_url" name="target_url" required />
-          </div>
-          <div class="form-group">
-            <label>Hak Akses Peran</label>
-            <div class="checkbox-group">
-              {{range .Roles}}
-              <label>
-                <input type="checkbox" name="role_ids" value="{{.ID}}" />
-                {{.Name}} ({{.Type}})
-              </label>
-              {{end}}
+<!-- Gunakan x-data untuk state management form -->
+<div x-data="appForm()" class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-md">
+
+    <!-- Title -->
+    <h2 class="text-2xl font-semibold mb-1 flex items-center gap-2">
+        <i data-lucide="app-window" class="w-6 h-6 text-gray-700"></i>
+        Tambah Aplikasi Baru
+    </h2>
+    <p class="text-gray-600 mb-6">Isi data berikut untuk mendaftarkan aplikasi baru.</p>
+
+    <form action="/admin/applications/create" method="POST" enctype="multipart/form-data" class="space-y-6">
+
+        <!-- Nama & Slug (Auto Generate) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                    <i data-lucide="badge-info" class="w-4 h-4"></i>
+                    Nama Aplikasi
+                </label>
+                <!-- Binding x-model untuk trigger auto slug -->
+                <input 
+                    type="text" 
+                    name="name" 
+                    x-model="name" 
+                    @input="generateSlug()"
+                    class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" 
+                    placeholder="Contoh: Sistem Akademik"
+                    required 
+                />
             </div>
-          </div>
 
-          <button type="submit" class="btn btn-primary">Simpan Aplikasi</button>
-        </form>
-      </div>
+            <div>
+                <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                    <i data-lucide="hash" class="w-4 h-4"></i>
+                    Slug (URL Friendly)
+                </label>
+                <input 
+                    type="text" 
+                    name="slug" 
+                    x-model="slug"
+                    class="w-full p-3 border rounded-md bg-gray-50 text-gray-600" 
+                    placeholder="contoh: sistem-akademik"
+                    required 
+                />
+                <p class="text-xs text-gray-500 mt-1">Otomatis dibuat dari nama aplikasi.</p>
+            </div>
+        </div>
+
+        <!-- Deskripsi -->
+        <div>
+            <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                <i data-lucide="align-left" class="w-4 h-4"></i>
+                Deskripsi
+            </label>
+            <textarea name="description" class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" rows="3" placeholder="Jelaskan fungsi aplikasi ini..."></textarea>
+        </div>
+
+        <!-- Target URL -->
+        <div>
+            <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                <i data-lucide="link" class="w-4 h-4"></i>
+                Target URL
+            </label>
+            <input type="url" name="target_url" class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://..." required />
+        </div>
+
+        <!-- Icon File dengan Preview -->
+        <div>
+            <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                <i data-lucide="image-up" class="w-4 h-4"></i>
+                Icon Aplikasi
+            </label>
+
+            <div class="flex items-start gap-4 mt-2">
+                <!-- Preview Image Box -->
+                <div class="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
+                    <template x-if="imageUrl">
+                        <img :src="imageUrl" class="w-full h-full object-cover">
+                    </template>
+                    <template x-if="!imageUrl">
+                        <span class="text-gray-400 text-xs text-center p-1">No Image</span>
+                    </template>
+                </div>
+
+                <div class="flex-1">
+                    <input 
+                        type="file" 
+                        name="icon_file" 
+                        accept=".png,.jpg,.jpeg,.svg" 
+                        @change="fileChosen"
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
+                    />
+                    <p class="text-sm text-gray-500 mt-2">Format: PNG, JPG, JPEG, SVG. Max 2MB.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Roles & Positions Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Roles -->
+            <div class="bg-gray-50 p-4 rounded-lg border">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-semibold text-gray-700 flex items-center gap-2">
+                        <i data-lucide="users" class="w-4 h-4"></i>
+                        Akses Peran
+                    </label>
+                    <button type="button" @click="toggleAllRoles()" class="text-xs text-blue-600 hover:underline">
+                        Pilih Semua
+                    </button>
+                </div>
+                
+                <div class="max-h-48 overflow-y-auto space-y-2 pr-2">
+                    {{range .Data.Roles}}
+                    <label class="flex items-center gap-2 bg-white px-3 py-2 rounded border cursor-pointer hover:bg-blue-50 transition">
+                        <input type="checkbox" name="role_ids" value="{{.ID}}" class="role-checkbox rounded text-blue-600" />
+                        <span class="text-sm">{{.Name}}</span>
+                    </label>
+                    {{end}}
+                </div>
+            </div>
+
+            <!-- Positions -->
+            <div class="bg-gray-50 p-4 rounded-lg border">
+                <div class="flex justify-between items-center mb-3">
+                    <label class="font-semibold text-gray-700 flex items-center gap-2">
+                        <i data-lucide="briefcase" class="w-4 h-4"></i>
+                        Akses Jabatan
+                    </label>
+                    <button type="button" @click="toggleAllPositions()" class="text-xs text-blue-600 hover:underline">
+                        Pilih Semua
+                    </button>
+                </div>
+
+                <div class="max-h-48 overflow-y-auto space-y-2 pr-2">
+                    {{range .Data.Position}}
+                    <label class="flex items-center gap-2 bg-white px-3 py-2 rounded border cursor-pointer hover:bg-blue-50 transition">
+                        <input type="checkbox" name="position_ids" value="{{.ID}}" class="position-checkbox rounded text-blue-600" />
+                        <span class="text-sm">{{.Name}}</span>
+                    </label>
+                    {{end}}
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit -->
+        <div class="pt-4 border-t">
+            <button type="submit" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md shadow flex items-center justify-center gap-2 transition">
+                <i data-lucide="save" class="w-4 h-4"></i>
+                Simpan Aplikasi
+            </button>
+        </div>
+
+    </form>
+
+    <!-- Back -->
+    <div class="mt-6 text-center sm:text-left">
+        <a href="/admin/applications"
+           class="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            Kembali ke Daftar Aplikasi
+        </a>
     </div>
-  </body>
-</html>
+
+</div>
+
+<!-- Alpine Logic -->
+<script>
+    function appForm() {
+        return {
+            name: '',
+            slug: '',
+            imageUrl: null,
+
+            // Logic 1: Auto Generate Slug
+            generateSlug() {
+                this.slug = this.name
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s-]/g, '') 
+                    .trim()
+                    .replace(/\s+/g, '-')         
+                    .replace(/-+/g, '-');        
+            },
+
+            // Logic 2: Image Preview
+            fileChosen(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    this.imageUrl = URL.createObjectURL(file);
+                }
+            },
+
+            // Logic 3: Toggle Checkboxes (Pilih Semua)
+            toggleAllRoles() {
+                const checkboxes = document.querySelectorAll('.role-checkbox');
+                // Cek apakah ada satu yang belum check? Jika ya, check semua. Jika semua checked, uncheck semua.
+                const allChecked = Array.from(checkboxes).every(c => c.checked);
+                checkboxes.forEach(c => c.checked = !allChecked);
+            },
+
+            toggleAllPositions() {
+                const checkboxes = document.querySelectorAll('.position-checkbox');
+                const allChecked = Array.from(checkboxes).every(c => c.checked);
+                checkboxes.forEach(c => c.checked = !allChecked);
+            }
+        }
+    }
+</script>
+
+{{end}}

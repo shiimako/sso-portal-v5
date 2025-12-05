@@ -4,29 +4,32 @@ package admincontroller
 
 import (
 	"net/http"
-	"sso-portal-v3/handlers" // Sesuaikan path
+	"sso-portal-v3/config" // Sesuaikan path
+	"sso-portal-v3/models"
+	"sso-portal-v3/views"
 )
 
 type AdminController struct {
-	env *handlers.Env
+	env   *config.Env
+	views *views.Views
 }
 
-func NewAdminController(env *handlers.Env) *AdminController {
-	return &AdminController{env: env}
+func NewAdminController(env *config.Env, v *views.Views) *AdminController {
+	return &AdminController{env: env, views: v}
 }
 
 // Dashboard menampilkan halaman utama panel admin.
 func (ac *AdminController) Dashboard(w http.ResponseWriter, r *http.Request) {
-	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
+	
+	unreadErrors, err := models.CountUnreadErrors(ac.env.DB)
+    if err != nil {
+        // Jika gagal hitung (misal DB mati), set 0 saja biar dashboard tetap jalan
+        unreadErrors = 0
+    }
 
-	// Kirim data nama admin ke template
-	data := map[string]interface{}{
-		"UserName": session.Values["user_name"],
+	pageData := map[string]interface{}{
+		"UnreadErrors": unreadErrors,
 	}
 
-	// Render halaman dashboard admin
-	err := ac.env.Templates.ExecuteTemplate(w, "admin-dashboard.html", data)
-	if err != nil {
-		http.Error(w, "Gagal render halaman admin", http.StatusInternalServerError)
-	}
+	ac.views.RenderPage(w, r, "admin-dashboard", pageData)
 }

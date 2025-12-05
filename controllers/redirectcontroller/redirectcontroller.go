@@ -3,20 +3,23 @@ package redirectcontroller
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
-	"sso-portal-v3/handlers"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
+	"sso-portal-v3/views"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
 type RedirectController struct {
-	env *handlers.Env
+	env   *config.Env
+	views *views.Views
 }
 
-func NewRedirectController(env *handlers.Env) *RedirectController {
-	return &RedirectController{env: env}
+func NewRedirectController(env *config.Env, v *views.Views) *RedirectController {
+	return &RedirectController{env: env, views: v}
 }
 
 // Claims adalah struktur data (Payload) di dalam JWT.
@@ -31,24 +34,9 @@ type Claims struct {
 
 // RedirectToApp membuat JWT dan mengarahkan pengguna ke aplikasi tujuan.
 func (rc *RedirectController) RedirectToApp(w http.ResponseWriter, r *http.Request) {
-	session, _ := rc.env.Store.Get(r, rc.env.SessionName)
 
-	if auth, ok := session.Values["authenticated"].(bool); !ok || !auth {
-		http.Error(w, "Tidak terautentikasi", http.StatusUnauthorized)
-		return
-	}
-	activeRole := session.Values["active_role"].(string)
-
-	userID, ok := session.Values["user_id"].(int)
-	if !ok {
-		http.Redirect(w, r, "/", http.StatusFound)
-		return
-	}
-	user, err := models.FindUserByID(rc.env.DB, userID)
-	if err != nil {
-		http.Error(w, "Gagal mengambil detail pengguna", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value("UserLogin").(*models.FullUser)
+	role := user.Roles[0].Name
 
 	appSlug := r.URL.Query().Get("app")
 	if appSlug == "" {
@@ -63,35 +51,36 @@ func (rc *RedirectController) RedirectToApp(w http.ResponseWriter, r *http.Reque
 	}
 
 	profileData := make(map[string]string)
-	if user.Student.ID != 0 {
+	if user.Student != nil && user.Student.ID != 0 {
 		profileData["student_id"] = fmt.Sprintf("%d", user.Student.ID)
 	}
-	if user.Lecturer.ID != 0 {
+
+	if user.Lecturer != nil && user.Lecturer.ID != 0 {
 		profileData["lecturer_id"] = fmt.Sprintf("%d", user.Lecturer.ID)
 	}
 
-	expirationTime := time.Now().Add(10 * time.Second)
+	expirationTime := time.Now().Add(2 * time.Minute)
 	claims := &Claims{
 		Name:    user.Name,
 		Email:   user.Email,
-		Avatar:  user.Avatar.String,
-		Role:    activeRole,
+		Avatar:  fmt.Sprintf("%s/avatar/%d", os.Getenv("APP_BASE_URL"), user.ID),
+		Role:    role,
 		Profile: profileData,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expirationTime),
-			Subject:   fmt.Sprintf("%d", userID),
-			Issuer:    "SSO-PNC",
+			Subject:   fmt.Sprintf("%d", user.ID),
+			Issuer:   config.Issuer,
+			Audience:  jwt.ClaimStrings{appSlug},
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 
-	jwtSecret := os.Getenv("JWT_SECRET_KEY")
-	tokenString, err := token.SignedString([]byte(jwtSecret))
+	tokenString, err := token.SignedString(config.PrivateKey)
 	if err != nil {
 		http.Error(w, "Gagal membuat token", http.StatusInternalServerError)
 		return
 	}
-	finalURL := fmt.Sprintf("%s?token=%s", app.TargetURL, tokenString)
+	finalURL := fmt.Sprintf("%s?token=%s", app.TargetURL, url.QueryEscape(tokenString))
 	http.Redirect(w, r, finalURL, http.StatusTemporaryRedirect)
 }

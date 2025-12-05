@@ -11,7 +11,6 @@ import (
 	"sso-portal-v3/controllers/dashboardcontroller"
 	"sso-portal-v3/controllers/redirectcontroller"
 	"sso-portal-v3/controllers/usercontroller"
-	"sso-portal-v3/handlers"
 	"sso-portal-v3/middleware"
 	"sso-portal-v3/views"
 
@@ -47,7 +46,7 @@ func main() {
 	}
 
 	// Inisialisasi environment untuk handler
-	env := &handlers.Env{
+	env := &config.Env{
 		DB:          db,
 		Store:       sessionStore,
 		Templates:   templates,
@@ -55,21 +54,34 @@ func main() {
 		BaseURL:     os.Getenv("APP_BASE_URL"),
 	}
 
+	viewEngine := views.NewViews(env)
+
 	// Inisialisasi Google OAuth2 config
 	oauthConfig := config.InitGoogleOAuthConfig(env.BaseURL)
 	env.GoogleOAuthConfig = oauthConfig
 
+	// Load RSA keys untuk JWT
+	if err := config.LoadKeys(); err != nil {
+    log.Fatalf("Gagal memuat RSA keys: %v", err)
+	}
+
 	// Inisialisasi controller
 	authCtrl := authcontroller.NewAuthController(env)
-	dashboardCtrl := dashboardcontroller.NewDashboardController(env)
-	adminCtrl := admincontroller.NewAdminController(env)
-	redirectCtrl := redirectcontroller.NewRedirectController(env)
-	userCtrl := usercontroller.NewUserController(env)
+	dashboardCtrl := dashboardcontroller.NewDashboardController(env, viewEngine)
+	adminCtrl := admincontroller.NewAdminController(env, viewEngine)
+	redirectCtrl := redirectcontroller.NewRedirectController(env, viewEngine)
+	userCtrl := usercontroller.NewUserController(env, viewEngine)
 
 	// Inisialisasi router
 	r := mux.NewRouter()
 
-	
+	uploadsFs := http.FileServer(http.Dir("./public/uploads"))
+	r.PathPrefix("/uploads/").Handler(
+		http.StripPrefix("/uploads/", uploadsFs),
+	)
+	staticFs := http.FileServer(http.Dir("./public/static"))
+	r.PathPrefix("/static/").Handler(http.StripPrefix("/static/", staticFs))
+
 	// ===================================
 	// AUTHENTICATION ROUTES
 	// ====================================
@@ -78,27 +90,29 @@ func main() {
 	r.HandleFunc("/auth/google/callback", authCtrl.GoogleCallback).Methods("GET")
 	r.HandleFunc("/logout", authCtrl.Logout).Methods("GET")
 
+	protected := r.NewRoute().Subrouter()
+	protected.Use(middleware.GlobalAuthMiddleware(env))
 	// ===================================
 	// DASHBOARD ROUTES
 	// ====================================
-	r.HandleFunc("/dashboard", dashboardCtrl.Index).Methods("GET")
+	protected.HandleFunc("/dashboard", dashboardCtrl.Index).Methods("GET")
 
 	// ===================================
 	// USER PROFILE ROUTES
 	// ====================================
-	r.HandleFunc("/profile/edit", userCtrl.ShowProfileForm).Methods("GET")
-	r.HandleFunc("/profile/update", userCtrl.HandleProfileUpdate).Methods("POST")
+	protected.HandleFunc("/profile/edit", userCtrl.ShowProfileForm).Methods("GET")
+	protected.HandleFunc("/profile/update", userCtrl.HandleProfileUpdate).Methods("POST")
+	r.HandleFunc("/avatar/{userID}", userCtrl.ServeAvatar).Methods("GET")
 
 	// ===================================
 	// REDIRECT MANAGEMENT
 	// ====================================
-	r.HandleFunc("/redirect", redirectCtrl.RedirectToApp).Methods("GET")
-
+	protected.HandleFunc("/redirect", redirectCtrl.RedirectToApp).Methods("GET")
 
 	// ===================================
 	// ADMIN ROUTES
 	// ====================================
-	adminRouter := r.PathPrefix("/admin").Subrouter()
+	adminRouter := protected.PathPrefix("/admin").Subrouter()
 	adminRouter.Use(middleware.AdminMiddleware(env))
 	adminRouter.HandleFunc("/dashboard", adminCtrl.Dashboard).Methods("GET")
 
@@ -119,6 +133,11 @@ func main() {
 	adminRouter.HandleFunc("/applications/update/{id}", adminCtrl.UpdateApplication).Methods("POST")
 	adminRouter.HandleFunc("/applications/delete/{id}", adminCtrl.DeleteApplication).Methods("POST")
 
+	// ===================================
+	// LOG MANAGEMENT
+	// ====================================
+	adminRouter.HandleFunc("/sync/stream", adminCtrl.StreamUserSync).Methods("GET")
+	adminRouter.HandleFunc("/sync-logs", adminCtrl.SyncLogsPage).Methods("GET")
 
 	port := os.Getenv("PORT")
 	log.Printf("Server berjalan di http://localhost:%s", port)

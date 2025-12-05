@@ -8,16 +8,16 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sso-portal-v3/handlers"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
 	"strings"
 )
 
 type AuthController struct {
-	env *handlers.Env
+	env *config.Env
 }
 
-func NewAuthController(env *handlers.Env) *AuthController {
+func NewAuthController(env *config.Env) *AuthController {
 	return &AuthController{env: env}
 }
 
@@ -36,7 +36,7 @@ func (ac *AuthController) ShowLoginPage(w http.ResponseWriter, r *http.Request) 
 		"FlashMessages": flashes,
 	}
 
-	err := ac.env.Templates.ExecuteTemplate(w, "login.html", data)
+	err := ac.env.Templates["login"].ExecuteTemplate(w, "login.html", data)
 	if err != nil {
 		log.Printf("Gagal render template login: %v", err)
 		http.Error(w, "Terjadi kesalahan internal", http.StatusInternalServerError)
@@ -145,7 +145,9 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if !user.Avatar.Valid && userProfile.Picture != "" {
+	avatarEmpty := !user.Avatar.Valid || strings.TrimSpace(user.Avatar.String) == ""
+
+	if avatarEmpty && userProfile.Picture != "" {
 		log.Printf("INFO: Avatar untuk user %d kosong, mengisi dari Google...", user.ID)
 		err = models.UpdateUserAvatar(ac.env.DB, user.ID, userProfile.Picture)
 		if err != nil {
@@ -158,8 +160,8 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 
 	if user.Avatar.Valid {
 		session.Values["avatar"] = user.Avatar.String
-	}else{
-	session.Values["avatar"] = userProfile.Picture
+	} else {
+		session.Values["avatar"] = userProfile.Picture
 	}
 
 	delete(session.Values, "state")
@@ -168,11 +170,10 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 		session.AddFlash("Akun Anda tidak memiliki peran. Hubungi administrator.")
 		session.Save(r, w)
 		http.Redirect(w, r, "/", http.StatusFound)
-	} else {
-		session.Values["active_role"] = user.Roles[0].Name
-		session.Save(r, w)
-		http.Redirect(w, r, "/dashboard", http.StatusFound)
+		return
 	}
+	session.Save(r, w)
+	http.Redirect(w, r, "/dashboard", http.StatusFound)
 }
 
 // Logout menghapus session pengguna
