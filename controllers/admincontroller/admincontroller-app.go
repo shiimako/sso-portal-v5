@@ -106,7 +106,7 @@ func (ac *AdminController) NewApplicationForm(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	position, err := models.GetAllPosition(ac.env.DB)
+	position, err := models.GetAllPositions(ac.env.DB)
 	if err != nil {
 		http.Error(w, "Gagal mengambil data peran", http.StatusInternalServerError)
 		return
@@ -235,7 +235,7 @@ func (ac *AdminController) EditApplicationForm(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	allPos, err := models.GetAllPosition(ac.env.DB)
+	allPos, err := models.GetAllPositions(ac.env.DB)
 	if err != nil {
 		http.Error(w, "Gagal mengambil data posisi", http.StatusInternalServerError)
 		return

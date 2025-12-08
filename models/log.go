@@ -25,11 +25,27 @@ func CreateLog(db *sqlx.DB, logType, module, status, message string) error {
 	return err
 }
 
-// GetLogs mengambil list log (pagination)
-func GetLogs(db *sqlx.DB, limit, offset int) ([]SyncLog, error) {
+// GetLogs dengan Filter & Sorting DESC
+func GetLogs(db *sqlx.DB, limit, offset int, moduleFilter string) ([]SyncLog, error) {
 	var logs []SyncLog
-	query := `SELECT * FROM sync_logs ORDER BY created_at DESC LIMIT ? OFFSET ?`
-	err := db.Select(&logs, query, limit, offset)
+	var err error
+
+	// Base Query
+	query := "SELECT * FROM sync_logs"
+	args := []interface{}{}
+
+	// Dynamic Filter
+	if moduleFilter != "" {
+		query += " WHERE module = ?"
+		args = append(args, moduleFilter)
+	}
+
+	// Sorting & Pagination
+	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
+	args = append(args, limit, offset)
+
+	// Eksekusi
+	err = db.Select(&logs, query, args...)
 	return logs, err
 }
 
@@ -44,4 +60,19 @@ func CountUnreadErrors(db *sqlx.DB) (int, error) {
 func MarkErrorsAsRead(db *sqlx.DB) error {
 	_, err := db.Exec("UPDATE sync_logs SET is_read = 1 WHERE status = 'ERROR'")
 	return err
+}
+
+// CountLogs dengan Filter (untuk Pagination)
+func CountLogs(db *sqlx.DB, moduleFilter string) (int, error) {
+	var count int
+	query := "SELECT COUNT(*) FROM sync_logs"
+	args := []interface{}{}
+
+	if moduleFilter != "" {
+		query += " WHERE module = ?"
+		args = append(args, moduleFilter)
+	}
+
+	err := db.Get(&count, query, args...)
+	return count, err
 }

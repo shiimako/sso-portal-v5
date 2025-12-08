@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 	"sso-portal-v3/models"
+	"sso-portal-v3/services"
 	"strconv"
-	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -45,11 +45,11 @@ func (ac *AdminController) ListUsers(w http.ResponseWriter, r *http.Request) {
 	unreadErrors, _ := models.CountUnreadErrors(ac.env.DB)
 
 	pageData := map[string]interface{}{
-		"Users": users,
-		"Page" : page,
-		"Limit" : limit,
-		"Search": search,
-		"Role": role,
+		"Users":        users,
+		"Page":         page,
+		"Limit":        limit,
+		"Search":       search,
+		"Role":         role,
 		"UnreadErrors": unreadErrors,
 	}
 
@@ -115,18 +115,18 @@ func (ac *AdminController) DetailUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := map[string]interface{}{
-		"User":        user,
-		"Role":        role,
-		"Positions":   positions,
-		"Profile":     profile,
+		"User":      user,
+		"Role":      role,
+		"Positions": positions,
+		"Profile":   profile,
 	}
 
 	ac.views.RenderPage(w, r, "admin-user-detail", data)
 }
 
-// StreamUserSync menangani SSE untuk Sinkronisasi User (Dummy Logic)
+// StreamUserSync menangani SSE untuk User
 func (ac *AdminController) StreamUserSync(w http.ResponseWriter, r *http.Request) {
-    // 1. Setup Header SSE
+    // ... (Header SSE standar) ...
     w.Header().Set("Content-Type", "text/event-stream")
     w.Header().Set("Cache-Control", "no-cache")
     w.Header().Set("Connection", "keep-alive")
@@ -137,45 +137,31 @@ func (ac *AdminController) StreamUserSync(w http.ResponseWriter, r *http.Request
         return
     }
 
-    // Helper kirim JSON ke browser
-    sendUpdate := func(progress int, logMsg, status string) {
-        data := map[string]interface{}{
-            "progress": progress,
-            "log":      logMsg,
-            "status":   status,
-        }
+    sendJSON := func(data map[string]interface{}) {
         jsonMsg, _ := json.Marshal(data)
         fmt.Fprintf(w, "data: %s\n\n", jsonMsg)
         flusher.Flush()
     }
 
-    // --- MULAI LOGIKA SINKRONISASI SEMENTARA ---
-    
-    // Catat log DB: Start
-    models.CreateLog(ac.env.DB, "MANUAL", "USER", "RUNNING", "Memulai sinkronisasi user manual.")
+    // 1. Log DB
+    models.CreateLog(ac.env.DB, "MANUAL", "USER", "RUNNING", "Memulai sync User.")
 
-    sendUpdate(5, "Menghubungkan ke API Data Center...", "running")
-    time.Sleep(1 * time.Second) // Simulasi delay koneksi
-
-    sendUpdate(10, "Koneksi berhasil. Meminta data /users/sync...", "running")
-    time.Sleep(500 * time.Millisecond)
-
-    // Simulasi Pagination Loop
-    totalPages := 5
-    for i := 1; i <= totalPages; i++ {
-        // Simulasi fetch API
-        offset := (i - 1) * 100
-        sendUpdate(10 + (i * 15), fmt.Sprintf("⬇️ Fetching Page %d (Offset: %d)...", i, offset), "running")
-        
-        time.Sleep(800 * time.Millisecond) // Simulasi download
-
-        // Simulasi Insert DB
-        sendUpdate(10 + (i * 15) + 5, fmt.Sprintf("✅ Menyimpan %d user ke database lokal...", 100), "running")
-        time.Sleep(200 * time.Millisecond) // Simulasi insert query
+    // 2. Reporter
+    serviceReporter := func(progress int, msg string) {
+        // Batasi progress max 99 biar ga nutup modal sebelum selesai beneran
+        if progress >= 100 { progress = 99 }
+        sendJSON(map[string]interface{}{"progress": progress, "log": msg, "status": "running"})
     }
 
-    // Catat log DB: Sukses
-    models.CreateLog(ac.env.DB, "MANUAL", "USER", "SUCCESS", "Berhasil sinkronisasi 500 user.")
+    // 3. Eksekusi Service
+    err := services.SyncUsers(ac.env.DB, serviceReporter)
 
-    sendUpdate(100, "✨ Sinkronisasi User Selesai!", "done")
+    // 4. Handling
+    if err != nil {
+        models.CreateLog(ac.env.DB, "MANUAL", "USER", "ERROR", err.Error())
+        sendJSON(map[string]interface{}{"status": "error", "message": err.Error(), "log": "❌ Gagal."})
+    } else {
+        models.CreateLog(ac.env.DB, "MANUAL", "USER", "SUCCESS", "Sync User Berhasil.")
+        sendJSON(map[string]interface{}{"status": "done", "log": "✨ Selesai."})
+    }
 }

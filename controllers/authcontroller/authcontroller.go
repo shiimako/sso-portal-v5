@@ -126,6 +126,7 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 	user, err := models.FindUserByEmail(ac.env.DB, userProfile.Email)
 	if err != nil {
 		http.Error(w, "Gagal mengambil detail user", http.StatusInternalServerError)
+		log.Println("ERROR : ", err)
 		return
 	}
 

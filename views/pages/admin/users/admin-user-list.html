@@ -1,15 +1,22 @@
 {{define "content"}}
 <div x-data="userList()" class="space-y-6">
+
+  <div>
+      <a href="/admin/dashboard" class="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition text-sm font-medium">
+          <i data-lucide="arrow-left" class="w-4 h-4"></i>
+          Kembali ke Dashboard Admin
+      </a>
+  </div>
   
-  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+  <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-200 pb-4">
     <div>
         <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
-            <div class="p-2 bg-gray-100 rounded-lg">
-                <i data-lucide="users" class="w-5 h-5 text-gray-700"></i>
+            <div class="p-2 bg-indigo-50 rounded-lg">
+                <i data-lucide="users" class="w-5 h-5 text-indigo-600"></i>
             </div>
             Manajemen Pengguna
         </h3>
-        <p class="text-gray-500 text-sm mt-1">Total {{.Data.Total}} pengguna terdaftar dari Data Center.</p>
+        <p class="text-gray-500 text-sm mt-1 ml-1">Total {{.Data.Total}} pengguna terdaftar.</p>
     </div>
 
     <div class="flex items-center gap-3">
@@ -27,8 +34,6 @@
         </button>
     </div>
   </div>
-
-  <hr class="border-gray-200" />
 
   <div class="flex flex-col sm:flex-row gap-4 w-full bg-gray-50 p-4 rounded-xl border border-gray-100">
       <form method="GET" class="flex gap-3 w-full">
@@ -272,6 +277,7 @@
                   
                   // Status: Error
                   if (data.status === 'error') {
+                        this.syncCompleted = true;
                       this.syncLogs.push('❌ ERROR: ' + data.message);
                       eventSource.close();
                   }

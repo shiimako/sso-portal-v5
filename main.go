@@ -139,6 +139,18 @@ func main() {
 	adminRouter.HandleFunc("/sync/stream", adminCtrl.StreamUserSync).Methods("GET")
 	adminRouter.HandleFunc("/sync-logs", adminCtrl.SyncLogsPage).Methods("GET")
 
+	adminRouter.HandleFunc("/jurusan", adminCtrl.ListJurusan).Methods("GET")
+	adminRouter.HandleFunc("/jurusan/sync/stream", adminCtrl.StreamJurusanSync).Methods("GET")
+
+	adminRouter.HandleFunc("/prodi", adminCtrl.ListProdi).Methods("GET")
+	adminRouter.HandleFunc("/prodi/sync/stream", adminCtrl.StreamProdiSync).Methods("GET")
+
+	adminRouter.HandleFunc("/jabatan", adminCtrl.ListJabatan).Methods("GET")
+	adminRouter.HandleFunc("/jabatan/sync/stream", adminCtrl.StreamJabatanSync).Methods("GET")
+
+	adminRouter.HandleFunc("/roles", adminCtrl.ListRoles).Methods("GET")
+	adminRouter.HandleFunc("/roles/sync/stream", adminCtrl.StreamRoleSync).Methods("GET")
+
 	port := os.Getenv("PORT")
 	log.Printf("Server berjalan di http://localhost:%s", port)
 	err = http.ListenAndServe(":"+port, r)
