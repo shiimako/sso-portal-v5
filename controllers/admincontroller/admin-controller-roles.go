@@ -36,18 +36,14 @@ func (ac *AdminController) StreamRoleSync(w http.ResponseWriter, r *http.Request
 		flusher.Flush()
 	}
 
-	// 1. Log Start
 	models.CreateLog(ac.env.DB, "MANUAL", "ROLE", "RUNNING", "Memulai sync Role.")
 
-	// 2. Reporter
 	serviceReporter := func(progress int, msg string) {
 		sendJSON(map[string]interface{}{"progress": progress, "log": msg, "status": "running"})
 	}
 
-	// 3. Eksekusi Service
 	err := services.SyncRoles(ac.env.DB, serviceReporter)
 
-	// 4. Finalisasi
 	if err != nil {
 		models.CreateLog(ac.env.DB, "MANUAL", "ROLE", "ERROR", err.Error())
 		sendJSON(map[string]interface{}{"status": "error", "message": err.Error(), "log": "❌ Gagal Sync."})

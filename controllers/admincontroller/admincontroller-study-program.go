@@ -18,7 +18,6 @@ func (ac *AdminController) ListProdi(w http.ResponseWriter, r *http.Request) {
 }
 
 func (ac *AdminController) StreamProdiSync(w http.ResponseWriter, r *http.Request) {
-	// ... (Header SSE sama persis) ...
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -35,18 +34,18 @@ func (ac *AdminController) StreamProdiSync(w http.ResponseWriter, r *http.Reques
 		flusher.Flush()
 	}
 
-	// Log Start
+
 	models.CreateLog(ac.env.DB, "MANUAL", "PRODI", "RUNNING", "Memulai sync Prodi.")
 
-	// Reporter
+
 	serviceReporter := func(progress int, msg string) {
 		sendJSON(map[string]interface{}{"progress": progress, "log": msg, "status": "running"})
 	}
 
-	// Eksekusi Service
+
 	err := services.SyncProdi(ac.env.DB, serviceReporter)
 
-	// Finalisasi
+
 	if err != nil {
 		models.CreateLog(ac.env.DB, "MANUAL", "PRODI", "ERROR", err.Error())
 		sendJSON(map[string]interface{}{"status": "error", "message": err.Error(), "log": "❌ Gagal Sync."})

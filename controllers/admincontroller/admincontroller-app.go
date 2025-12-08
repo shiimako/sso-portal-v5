@@ -61,7 +61,6 @@ func (ac *AdminController) ListApplications(w http.ResponseWriter, r *http.Reque
 func (ac *AdminController) DetailApplication(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
-	// Gunakan model yang sudah ada untuk mengambil detail aplikasi dan ID perannya
 	app, roleIDs, PosIDs, err := models.FindApplicationByID(ac.env.DB, id)
 	if err != nil {
 		http.Error(w, "Data aplikasi tidak ditemukan", http.StatusNotFound)
@@ -99,7 +98,6 @@ func (ac *AdminController) DetailApplication(w http.ResponseWriter, r *http.Requ
 
 // NewApplicationForm menampilkan form untuk membuat aplikasi baru.
 func (ac *AdminController) NewApplicationForm(w http.ResponseWriter, r *http.Request) {
-	// Panggil model untuk mendapatkan semua peran
 	roles, err := models.GetAllRoles(ac.env.DB)
 	if err != nil {
 		http.Error(w, "Gagal mengambil data peran", http.StatusInternalServerError)
@@ -122,8 +120,6 @@ func (ac *AdminController) NewApplicationForm(w http.ResponseWriter, r *http.Req
 
 // CreateApplication memproses form pembuatan aplikasi baru.
 func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Request) {
-	// 1. Gunakan ParseMultipartForm dengan limit 10MB
-	// Ini lebih aman daripada ParseForm biasa saat ada file upload
 	if err := r.ParseMultipartForm(10 << 20); err != nil {
 		http.Error(w, "File terlalu besar atau form error", http.StatusBadRequest)
 		return
@@ -135,28 +131,24 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 	targetURL := r.FormValue("target_url")
 	iconURL := "/uploads/icons/default.png"
 
-	// Ambil array checkbox
 	roleIDs := r.Form["role_ids"]
 	posIDs := r.Form["position_ids"]
 
-	// Validasi Field Wajib
 	if name == "" || slug == "" || targetURL == "" {
 		http.Error(w, "Nama, Slug, dan Target URL wajib diisi", http.StatusBadRequest)
 		return
 	}
 
-	// Validasi Format URL (Opsional tapi Recommended)
 	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
 		http.Error(w, "Target URL harus diawali dengan http:// atau https://", http.StatusBadRequest)
 		return
 	}
 
-	// Handle File Upload
+
 	file, header, err := r.FormFile("icon-file")
 	if err == nil {
 		defer file.Close()
 
-		// Validasi extension
 		ext := strings.ToLower(filepath.Ext(header.Filename))
 		allowed := map[string]bool{
 			".png": true, ".jpg": true, ".jpeg": true, ".svg": true,
@@ -168,7 +160,6 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 		}
 
 		// Buat filename aman: app_{slug}_icon.png
-		// Replace spasi di slug jaga-jaga kalau client-side JS dimatikan user
 		safeSlug := strings.ReplaceAll(slug, " ", "-")
 		filename := fmt.Sprintf("app-%s-icon%s", safeSlug, ext)
 
@@ -196,11 +187,9 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		// Update URL untuk database
 		iconURL = "/uploads/icons/" + filename
 	}
 
-	// Panggil model untuk menyimpan data
 	err = models.CreateApplication(ac.env.DB, name, description, slug, targetURL, iconURL, roleIDs, posIDs)
 	if err != nil {
 		log.Printf("ERROR: Gagal menyimpan aplikasi baru: %v", err)
@@ -208,7 +197,6 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	// Flash Message & Redirect
 	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
 	session.AddFlash("Aplikasi baru berhasil ditambahkan!")
 	session.Save(r, w)
@@ -227,7 +215,6 @@ func (ac *AdminController) EditApplicationForm(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Ambil semua kemungkinan peran untuk ditampilkan sebagai checkbox
 	allRoles, err := models.GetAllRoles(ac.env.DB)
 	if err != nil {
 		log.Println("Error : ", err)
@@ -241,7 +228,6 @@ func (ac *AdminController) EditApplicationForm(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	// Buat map untuk memudahkan pengecekan di template (mana yang harus dicentang)
 	currentRolesMap := make(map[int]bool)
 	for _, rid := range currentRoleIDs {
 		currentRolesMap[rid] = true
@@ -267,7 +253,6 @@ func (ac *AdminController) EditApplicationForm(w http.ResponseWriter, r *http.Re
 func (ac *AdminController) UpdateApplication(w http.ResponseWriter, r *http.Request) {
     id := mux.Vars(r)["id"]
 
-    // 1. Gunakan ParseMultipartForm (Wajib untuk file upload)
     if err := r.ParseMultipartForm(10 << 20); err != nil {
         http.Error(w, "Form error atau file terlalu besar", http.StatusBadRequest)
         return
@@ -277,7 +262,6 @@ func (ac *AdminController) UpdateApplication(w http.ResponseWriter, r *http.Requ
     description := r.FormValue("description")
     slug := r.FormValue("slug")
     targetURL := r.FormValue("target_url")
-    // Ambil icon lama dari hidden input, nanti ditimpa jika ada upload baru
     iconURL := r.FormValue("icon_url") 
     
     roleIDs := r.Form["role_ids"]
@@ -288,12 +272,11 @@ func (ac *AdminController) UpdateApplication(w http.ResponseWriter, r *http.Requ
         return
     }
 
-    // 2. Handle File Upload (Jika ada file baru)
     file, header, err := r.FormFile("icon-file")
     if err == nil {
         defer file.Close()
 
-        // Validasi Ext
+
         ext := strings.ToLower(filepath.Ext(header.Filename))
         allowed := map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".svg": true}
         if !allowed[ext] {
@@ -301,12 +284,12 @@ func (ac *AdminController) UpdateApplication(w http.ResponseWriter, r *http.Requ
             return
         }
 
-        // Buat nama file unik
+
         safeSlug := strings.ReplaceAll(slug, " ", "-")
         filename := fmt.Sprintf("app-%s-icon%s", safeSlug, ext)
         savePath := filepath.Join("public", "uploads", "icons", filename)
 
-        // Pastikan folder ada
+
         os.MkdirAll(filepath.Dir(savePath), 0755)
 
         out, err := os.Create(savePath)
@@ -326,7 +309,6 @@ func (ac *AdminController) UpdateApplication(w http.ResponseWriter, r *http.Requ
         iconURL = "/uploads/icons/" + filename
     }
 
-    // 3. Update Database
     err = models.UpdateApplication(ac.env.DB, id, name, description, slug, targetURL, iconURL, roleIDs, posIDs)
     if err != nil {
         log.Printf("ERROR: Gagal update aplikasi: %v", err)

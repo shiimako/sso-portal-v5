@@ -9,7 +9,7 @@ import (
 type SyncLog struct {
 	ID        int       `db:"id"`
 	Type      string    `db:"type"`      // MANUAL, CRON, WEBHOOK
-	Module    string    `db:"module"`    // USER
+	Module    string    `db:"module"`    
 	Status    string    `db:"status"`    // RUNNING, SUCCESS, ERROR
 	Message   string    `db:"message"`
 	IsRead    bool      `db:"is_read"`
@@ -30,21 +30,17 @@ func GetLogs(db *sqlx.DB, limit, offset int, moduleFilter string) ([]SyncLog, er
 	var logs []SyncLog
 	var err error
 
-	// Base Query
 	query := "SELECT * FROM sync_logs"
 	args := []interface{}{}
 
-	// Dynamic Filter
 	if moduleFilter != "" {
 		query += " WHERE module = ?"
 		args = append(args, moduleFilter)
 	}
 
-	// Sorting & Pagination
 	query += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
 	args = append(args, limit, offset)
 
-	// Eksekusi
 	err = db.Select(&logs, query, args...)
 	return logs, err
 }

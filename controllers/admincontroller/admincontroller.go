@@ -23,7 +23,6 @@ func (ac *AdminController) Dashboard(w http.ResponseWriter, r *http.Request) {
 	
 	unreadErrors, err := models.CountUnreadErrors(ac.env.DB)
     if err != nil {
-        // Jika gagal hitung (misal DB mati), set 0 saja biar dashboard tetap jalan
         unreadErrors = 0
     }
 

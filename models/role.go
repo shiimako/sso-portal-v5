@@ -8,7 +8,6 @@ import (
 	"github.com/jmoiron/sqlx"
 )
 
-// Role adalah struct untuk data peran.
 type Role struct {
 	ID   int `db:"id"`
 	Name string `db:"role_name"`

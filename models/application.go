@@ -38,11 +38,9 @@ apps := []Application{}
 		params = append(params, like, like, like)
 	}
 
-	// Ordering & pagination
 	query += ` ORDER BY id ASC LIMIT ? OFFSET ? `
 	params = append(params, pagesize, offset)
 
-	// Execute query
 	err := db.Select(&apps, query, params...)
 	if err != nil {
 		return nil, err
@@ -108,14 +106,12 @@ func FindApplicationByID(db *sqlx.DB, id string) (Application, []int, []int, err
 	var roleIDs []int
 	var posIDs []int
 
-	// 1. Ambil detail aplikasi
 	queryApp := `SELECT id, name, description, slug, target_url, icon_url FROM applications WHERE id = ?`
 	err := db.QueryRow(queryApp, id).Scan(&app.ID, &app.Name, &app.Description, &app.Slug, &app.TargetURL, &app.IconURL)
 	if err != nil {
 		return app, nil, nil, err
 	}
 
-	// 2. Ambil semua role_id yang terhubung dengan aplikasi ini
 	queryRoles := `SELECT role_id FROM application_role_access WHERE application_id = ?`
 	rows1, err := db.Query(queryRoles, id)
 	if err != nil {
@@ -230,10 +226,7 @@ func FindApplicationBySlug(db *sqlx.DB, slug string) (Application, error) {
 // FindAccessibleApps mengambil aplikasi yang dapat diakses berdasarkan role dan posisi.
 func FindAccessibleApps(db *sqlx.DB, roleName string, positionIDs []int) ([]Application, error) {
     
-    // TRICK: Handle Empty Slice
-    // sqlx.In akan error jika slice kosong. 
-    // Jadi jika kosong, kita isi string kosong "" agar query menjadi: IN ('')
-    // Ini aman karena tidak ada position_name yang namanya kosong.
+
     if len(positionIDs) == 0 {
         positionIDs = []int{0}
     }
@@ -255,7 +248,6 @@ func FindAccessibleApps(db *sqlx.DB, roleName string, positionIDs []int) ([]Appl
     WHERE apa.position_id IN (?)
     `
 
-    // Proses Query
     query, args, err := sqlx.In(query, roleName, positionIDs)
     if err != nil {
         return nil, err

@@ -14,7 +14,7 @@ import (
 // SyncProdi menarik data dari API Prodi
 func SyncProdi(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
 	
-	baseURL := "http://127.0.0.1:9999/api/v1/prodi/sync" // Sesuaikan port (8000/9999)
+	baseURL := "http://127.0.0.1:9999/api/v1/prodi/sync" 
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	reportFunc(10, "Menghubungkan ke API Data Center...")

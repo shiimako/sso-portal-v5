@@ -126,7 +126,6 @@ func (ac *AdminController) DetailUser(w http.ResponseWriter, r *http.Request) {
 
 // StreamUserSync menangani SSE untuk User
 func (ac *AdminController) StreamUserSync(w http.ResponseWriter, r *http.Request) {
-    // ... (Header SSE standar) ...
     w.Header().Set("Content-Type", "text/event-stream")
     w.Header().Set("Cache-Control", "no-cache")
     w.Header().Set("Connection", "keep-alive")
@@ -143,20 +142,18 @@ func (ac *AdminController) StreamUserSync(w http.ResponseWriter, r *http.Request
         flusher.Flush()
     }
 
-    // 1. Log DB
+
     models.CreateLog(ac.env.DB, "MANUAL", "USER", "RUNNING", "Memulai sync User.")
 
-    // 2. Reporter
+
     serviceReporter := func(progress int, msg string) {
-        // Batasi progress max 99 biar ga nutup modal sebelum selesai beneran
         if progress >= 100 { progress = 99 }
         sendJSON(map[string]interface{}{"progress": progress, "log": msg, "status": "running"})
     }
 
-    // 3. Eksekusi Service
+
     err := services.SyncUsers(ac.env.DB, serviceReporter)
 
-    // 4. Handling
     if err != nil {
         models.CreateLog(ac.env.DB, "MANUAL", "USER", "ERROR", err.Error())
         sendJSON(map[string]interface{}{"status": "error", "message": err.Error(), "log": "❌ Gagal."})

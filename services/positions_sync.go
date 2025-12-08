@@ -14,7 +14,7 @@ import (
 // SyncPositions menarik data dari API Jabatan
 func SyncPositions(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
 	
-	baseURL := "http://127.0.0.1:9999/api/v1/jabatan/sync" // Sesuaikan port
+	baseURL := "http://127.0.0.1:9999/api/v1/jabatan/sync" 
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	reportFunc(10, "Menghubungkan ke API Data Center...")
@@ -51,7 +51,6 @@ func SyncPositions(db *sqlx.DB, reportFunc func(progress int, msg string)) error
 	for i, item := range result.Data {
 		currentPercent := 50 + int(float64(i+1)/float64(totalData)*40)
 
-		// Parse Time
 		if item.DeletedAt != nil {
 			parsedTime, errParse := time.Parse(time.RFC3339, *item.DeletedAt)
 			if errParse == nil {

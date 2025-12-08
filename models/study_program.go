@@ -35,7 +35,6 @@ func GetAllStudyPrograms(db *sqlx.DB) ([]StudyProgram, error) {
 }
 
 func UpsertStudyPrograms(db *sqlx.DB, data DCStudyProgram) error {
-	// Pastikan kolom major_id diisi!
 	query := `
 		INSERT INTO study_programs 
 			(id, study_program_name, major_id, created_at, updated_at, deleted_at)

@@ -14,7 +14,7 @@ import (
 // SyncRoles menarik data dari API Roles
 func SyncRoles(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
 	
-	baseURL := "http://127.0.0.1:9999/api/v1/roles/sync" // Cek port 8000/9999
+	baseURL := "http://127.0.0.1:9999/api/v1/roles/sync" 
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	reportFunc(10, "Menghubungkan ke API Data Center...")
@@ -46,12 +46,11 @@ func SyncRoles(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
 
 	savedCount := 0
 	failedCount := 0
-	var errorDetails []string // Penampung detail error
+	var errorDetails []string 
 
 	for i, item := range result.Data {
 		currentPercent := 50 + int(float64(i+1)/float64(totalData)*40)
 
-		// Parse Time
 		if item.DeletedAt != nil {
 			parsedTime, errParse := time.Parse(time.RFC3339, *item.DeletedAt)
 			if errParse == nil {
@@ -67,18 +66,16 @@ func SyncRoles(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
 			errDetail := fmt.Sprintf("[ID %d: %v]", item.ID, err)
 			errorDetails = append(errorDetails, errDetail)
 			
-			// Log console
 			fmt.Printf("[SYNC ERROR] Role ID %d: %v\n", item.ID, err)
 			reportFunc(currentPercent, fmt.Sprintf("❌ Gagal ID %d", item.ID))
 		} else {
 			savedCount++
 			reportFunc(currentPercent, fmt.Sprintf("Menyimpan: %s", item.Name))
 		}
-		time.Sleep(200 * time.Millisecond) // Delay visual
+		time.Sleep(200 * time.Millisecond) 
 	}
 
 	if failedCount > 0 {
-		// Gabungkan error message
 		joinedErrors := strings.Join(errorDetails, ", ")
 
 		msg := fmt.Sprintf("⚠️ Selesai Parsial. %d Sukses, %d Gagal.", savedCount, failedCount)

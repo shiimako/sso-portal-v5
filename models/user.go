@@ -58,8 +58,7 @@ type DCUser struct {
 	UpdatedAt string  `json:"updated_at"`
 	DeletedAt *string `json:"deleted_at"`
 
-	// Handle Role: JSON User 1 pakai Object, User 2 & 3 pakai Integer langsung
-	// Kita sediakan dua-duanya, nanti di logic kita cek mana yang isi
+
 	RoleObj *struct {
 		ID   int    `json:"id_role"`
 		Nama string `json:"nama"`
@@ -68,30 +67,29 @@ type DCUser struct {
 
 	// Profile
 	Profile struct {
-		Address string `json:"alamat"` // JSON User 2 pakai "id_alamat" (typo di JSON?), kita coba handle
-		AddressAlt string `json:"id_alamat"` // Jaga-jaga kalau key-nya berubah
+		Address string `json:"alamat"`
+		AddressAlt string `json:"id_alamat"`
 		Phone   string `json:"no_hp"`
 	} `json:"profile"`
 
-	// Academic (Polimorfik: Bisa Student, Bisa Dosen, Bisa Kosong)
 	Academic DCAcademic `json:"academic"`
 }
 
 type DCAcademic struct {
-	// Fields Mahasiswa
+
 	NIM *string `json:"nim"`
 	
-	// Fields Dosen
-	NIP   *string `json:"nip"` // Kadang ada kadang ngga
+
+	NIP   *string `json:"nip"`
 	NUPTK *string `json:"nuptk"`
 	
-	// Jabatan Dosen (Array)
+
 	Positions []DCLecturerPos `json:"jabatan_dosen"`
 }
 
 type DCLecturerPos struct {
 	IDJabatan  int     `json:"id_jabatan"`
-	IDJurusan  *int    `json:"id_jurusan"` // Pointer biar bisa null
+	IDJurusan  *int    `json:"id_jurusan"` 
 	IDProdi    *int    `json:"id_prodi"`
 	StartDate  string  `json:"tanggal_mulai"`   // Format: "16-02-2021"
 	EndDate    *string `json:"tanggal_selesai"` // Format: "16-02-2025"
@@ -195,7 +193,7 @@ func FindUserByID(db *sqlx.DB, id int) (*FullUser, error) {
 
 	fu.Roles = append(fu.Roles, role)
 
-	// Ambil data tambahan berdasarkan peran
+
 	if role.Name == "mahasiswa" {
 		var s Student
 		err := db.Get(&s, "SELECT id, user_id, nim FROM students WHERE user_id = ?", fu.ID)
@@ -325,9 +323,6 @@ func UpsertFullUser(db *sqlx.DB, u DCUser) error {
 	}
 	defer tx.Rollback()
 
-	// A. NORMALISASI DATA SEBELUM INSERT
-	
-	// 1. Tentukan Role ID (Prioritas Object, lalu Int)
 	finalRoleID := 0
 	if u.RoleObj != nil {
 		finalRoleID = u.RoleObj.ID
@@ -335,16 +330,13 @@ func UpsertFullUser(db *sqlx.DB, u DCUser) error {
 		finalRoleID = *u.RoleID
 	}
 
-	// 2. Tentukan Alamat (Handle typo JSON)
 	finalAddress := u.Profile.Address
 	if finalAddress == "" {
 		finalAddress = u.Profile.AddressAlt
 	}
 
-	// 3. Lowercase Status (Jaga-jaga enum DB lowercase)
 	finalStatus := strings.ToLower(u.Status)
 
-	// 4. Parsing DeletedAt
 	var dbDeletedAt *string
 	if u.DeletedAt != nil {
 		t, _ := time.Parse(time.RFC3339, *u.DeletedAt)
@@ -352,9 +344,6 @@ func UpsertFullUser(db *sqlx.DB, u DCUser) error {
 		dbDeletedAt = &str
 	}
 
-	// -------------------------------------------------
-	// B. QUERY 1: TABEL USERS
-	// -------------------------------------------------
 	qUser := `
 		INSERT INTO users (id, name, email, status, address, phone_number, created_at, updated_at, deleted_at)
 		VALUES (:id, :name, :email, :status, :address, :phone, NOW(), NOW(), :deleted_at)
@@ -375,9 +364,6 @@ func UpsertFullUser(db *sqlx.DB, u DCUser) error {
 		return fmt.Errorf("user error: %v", err)
 	}
 
-	// -------------------------------------------------
-	// C. QUERY 2: TABEL USER_ROLES (Reset Role)
-	// -------------------------------------------------
 	if _, err := tx.Exec("DELETE FROM user_roles WHERE user_id = ?", u.ID); err != nil {
 		return fmt.Errorf("delete role error: %v", err)
 	}
@@ -387,15 +373,7 @@ func UpsertFullUser(db *sqlx.DB, u DCUser) error {
 		}
 	}
 
-	// -------------------------------------------------
-	// D. QUERY 3: DETAIL (MAHASISWA / DOSEN)
-	// -------------------------------------------------
 	
-	// Cek Role ID: 1=Admin, 2=Dosen, 3=Mahasiswa (Sesuaikan dengan DB kamu)
-	// Asumsi berdasarkan JSON kamu: 2=Mahasiswa?, 3=Dosen? 
-	// (User 2 punya NIM -> Mahasiswa. User 3 punya NUPTK -> Dosen)
-	
-	// KASUS MAHASISWA (Punya NIM)
 	if u.Academic.NIM != nil {
 		qMhs := `INSERT INTO students (user_id, nim) VALUES (?, ?) ON DUPLICATE KEY UPDATE nim = VALUES(nim)`
 		if _, err := tx.Exec(qMhs, u.ID, *u.Academic.NIM); err != nil {
@@ -403,22 +381,18 @@ func UpsertFullUser(db *sqlx.DB, u DCUser) error {
 		}
 	}
 
-	// KASUS DOSEN (Punya NUPTK atau Jabatan)
 	if u.Academic.NUPTK != nil || len(u.Academic.Positions) > 0 {
-		// 1. Upsert Tabel Lecturers
 		qDosen := `INSERT INTO lecturers (user_id, nip, nuptk) VALUES (?, ?, ?) 
 				   ON DUPLICATE KEY UPDATE nip = VALUES(nip), nuptk = VALUES(nuptk)`
 		if _, err := tx.Exec(qDosen, u.ID, u.Academic.NIP, u.Academic.NUPTK); err != nil {
 			return fmt.Errorf("lecturer error: %v", err)
 		}
 
-		// 2. Ambil ID Lecturer (Bukan User ID)
 		var lecturerID int
 		if err := tx.Get(&lecturerID, "SELECT id FROM lecturers WHERE user_id = ?", u.ID); err != nil {
 			return fmt.Errorf("get lecturer id error: %v", err)
 		}
 
-		// 3. Sync Jabatan Dosen (Hapus lama, Insert baru)
 		if _, err := tx.Exec("DELETE FROM lecturer_positions WHERE lecturer_id = ?", lecturerID); err != nil {
 			return fmt.Errorf("delete positions error: %v", err)
 		}
@@ -440,7 +414,6 @@ func UpsertFullUser(db *sqlx.DB, u DCUser) error {
 			    VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
             `
 			
-			// CreatedAt pakai tanggal mulai jabatan aja biar relevan
 			if _, err := tx.Exec(qPos, lecturerID, pos.IDJabatan, pos.IDJurusan, pos.IDProdi, startDateDB, endDateDB); err != nil {
 				return fmt.Errorf("insert position error: %v", err)
 			}
