@@ -4,22 +4,36 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
 	"strings"
 	"time"
 
-	"github.com/jmoiron/sqlx"
 )
 
 // SyncPositions menarik data dari API Jabatan
-func SyncPositions(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
+func SyncPositions(env *config.Env, reportFunc func(progress int, msg string), since string) error {
 	
-	baseURL := "http://127.0.0.1:9999/api/v1/jabatan/sync" 
+	baseURL := env.DataCenterURL
+	apiKey  := env.DataCenterKey
+	db      := env.DB
+
 	client := &http.Client{Timeout: 10 * time.Second}
 
-	reportFunc(10, "Menghubungkan ke API Data Center...")
+	apiURL := fmt.Sprintf("%s/jabatan/sync", baseURL)
+	if since != "" {
+		apiURL += fmt.Sprintf("?since=%s", since)
+		reportFunc(10, fmt.Sprintf("Mode Delta: %s", since))
+	} else {
+		reportFunc(10, "Mode Full Sync...")
+	}
 
-	resp, err := client.Get(baseURL)
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil { return fmt.Errorf("req error: %v", err) }
+
+	req.Header.Set("X-API-KEY", apiKey) 
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("gagal koneksi API: %v", err)
 	}

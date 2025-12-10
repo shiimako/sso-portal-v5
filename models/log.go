@@ -72,3 +72,17 @@ func CountLogs(db *sqlx.DB, moduleFilter string) (int, error) {
 	err := db.Get(&count, query, args...)
 	return count, err
 }
+
+// GetLastSuccessTime mengambil waktu created_at dari log sukses terakhir
+func GetLastSuccessTime(db *sqlx.DB, module string) (string, error) {
+	var lastTime string
+	query := `SELECT created_at FROM sync_logs WHERE module = ? AND status = 'SUCCESS' ORDER BY created_at DESC LIMIT 1`
+	err := db.Get(&lastTime, query, module)
+	
+	// Jika error (belum ada log), return string kosong
+	if err != nil {
+		return "", nil 
+	}
+	
+	return lastTime, nil
+}

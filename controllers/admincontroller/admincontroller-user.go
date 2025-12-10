@@ -3,10 +3,12 @@ package admincontroller
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sso-portal-v3/models"
 	"sso-portal-v3/services"
 	"strconv"
+	"strings"
 
 	"github.com/gorilla/mux"
 )
@@ -126,39 +128,62 @@ func (ac *AdminController) DetailUser(w http.ResponseWriter, r *http.Request) {
 
 // StreamUserSync menangani SSE untuk User
 func (ac *AdminController) StreamUserSync(w http.ResponseWriter, r *http.Request) {
-    w.Header().Set("Content-Type", "text/event-stream")
-    w.Header().Set("Cache-Control", "no-cache")
-    w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
 
-    flusher, ok := w.(http.Flusher)
-    if !ok {
-        http.Error(w, "Streaming unsupported", 500)
-        return
-    }
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		http.Error(w, "Streaming unsupported", 500)
+		return
+	}
 
-    sendJSON := func(data map[string]interface{}) {
-        jsonMsg, _ := json.Marshal(data)
-        fmt.Fprintf(w, "data: %s\n\n", jsonMsg)
-        flusher.Flush()
-    }
+	sendJSON := func(data map[string]interface{}) {
+		jsonMsg, _ := json.Marshal(data)
+		fmt.Fprintf(w, "data: %s\n\n", jsonMsg)
+		flusher.Flush()
+	}
 
+	models.CreateLog(ac.env.DB, "MANUAL", "USER", "RUNNING", "Memulai sync User.")
 
-    models.CreateLog(ac.env.DB, "MANUAL", "USER", "RUNNING", "Memulai sync User.")
+	serviceReporter := func(progress int, msg string) {
+		if progress >= 100 {
+			progress = 99
+		}
+		sendJSON(map[string]interface{}{"progress": progress, "log": msg, "status": "running"})
+	}
 
+	err := services.SyncUsers(ac.env, serviceReporter, "")
 
-    serviceReporter := func(progress int, msg string) {
-        if progress >= 100 { progress = 99 }
-        sendJSON(map[string]interface{}{"progress": progress, "log": msg, "status": "running"})
-    }
+	if err != nil {
+		models.CreateLog(ac.env.DB, "MANUAL", "USER", "ERROR", err.Error())
+		sendJSON(map[string]interface{}{"status": "error", "message": err.Error(), "log": "❌ Gagal."})
+	} else {
+		models.CreateLog(ac.env.DB, "MANUAL", "USER", "SUCCESS", "Sync User Berhasil.")
+		sendJSON(map[string]interface{}{"status": "done", "log": "✨ Selesai."})
+	}
+}
 
+func (ac *AdminController) RunUsersProgramsCron() {
 
-    err := services.SyncUsers(ac.env.DB, serviceReporter)
+	log.Println("⏰ [CRON] Memulai Sync Users...")
+	models.CreateLog(ac.env.DB, "CRON", "USER", "RUNNING", "Cron job jurusan berjalan otomatis.")
 
-    if err != nil {
-        models.CreateLog(ac.env.DB, "MANUAL", "USER", "ERROR", err.Error())
-        sendJSON(map[string]interface{}{"status": "error", "message": err.Error(), "log": "❌ Gagal."})
-    } else {
-        models.CreateLog(ac.env.DB, "MANUAL", "USER", "SUCCESS", "Sync User Berhasil.")
-        sendJSON(map[string]interface{}{"status": "done", "log": "✨ Selesai."})
-    }
+	lastTime, _ := models.GetLastSuccessTime(ac.env.DB, "USER")
+
+	cronReporter := func(progress int, msg string) {
+		if progress == 100 || strings.Contains(msg, "❌") {
+			log.Printf("[CRON USER] %s", msg)
+		}
+	}
+
+	err := services.SyncUsers(ac.env, cronReporter, lastTime)
+
+	if err != nil {
+		log.Printf("❌ [CRON] User Gagal: %v", err)
+		models.CreateLog(ac.env.DB, "CRON", "USER", "ERROR", err.Error())
+	} else {
+		log.Println("✅ [CRON] User Selesai.")
+		models.CreateLog(ac.env.DB, "CRON", "USER", "SUCCESS", "Cron job USER berhasil selesai.")
+	}
 }

@@ -205,8 +205,6 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
 
 <script>
-    // Pastikan ini dipanggil setelah DOM load, atau jika layout utama sudah memanggilnya, ini bisa dihapus.
-    // Jika layout pakai data-lucide, biasanya ada script global: lucide.createIcons();
     document.addEventListener("DOMContentLoaded", () => {
         if (typeof lucide !== 'undefined') {
             lucide.createIcons();
@@ -223,7 +221,6 @@
 
       startCrop(event) {
         let file = event.target.files[0];
-        // Reset input value agar user bisa memilih file yang sama jika salah cancel
         event.target.value = '';
 
         if (!file) return;
@@ -239,14 +236,12 @@
         reader.onload = (e) => {
           let img = document.getElementById("cropper-image");
 
-          // Reset cropper jika sudah ada sebelumnya
           if (cropper) {
              cropper.destroy();
           }
 
           img.src = e.target.result;
 
-          // Tunggu DOM update (Alpine) baru init Cropper
           this.$nextTick(() => {
             cropper = new Cropper(img, {
                 aspectRatio: 1,
@@ -278,7 +273,7 @@
             cropper = null;
             document.getElementById("cropper-image").src = "";
             }
-        }, 150); // Delay sedikit agar animasi modal selesai
+        }, 150); 
       },
 
       apply() {
@@ -298,7 +293,7 @@
         // Update preview
         document.getElementById("avatar-preview").src = base64;
 
-        // Set value ke hidden input untuk dikirim ke server
+    
         document.getElementById("avatar-result").value = base64;
 
         this.cancel();

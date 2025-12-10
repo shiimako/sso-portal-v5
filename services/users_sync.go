@@ -4,22 +4,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sso-portal-v3/config"
 	"sso-portal-v3/models"
 	"strings"
 	"time"
-
-	"github.com/jmoiron/sqlx"
 )
 
 // SyncUsers menarik data User (Support Pagination)
-func SyncUsers(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
-	
-	baseURL := "http://127.0.0.1:9999/api/v1/users/sync"
-	client := &http.Client{Timeout: 30 * time.Second}
-	limit := 50 
-	offset := 0 
+func SyncUsers(env *config.Env, reportFunc func(progress int, msg string), since string) error {
+
+	baseURL := fmt.Sprintf("%s/users/sync", env.DataCenterURL)
+	apiKey := env.DataCenterKey
+	db := env.DB
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	limit := 50
+	offset := 0
 	page := 1
-	
+
 	savedCount := 0
 	failedCount := 0
 	var errorDetails []string
@@ -28,14 +30,32 @@ func SyncUsers(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
 
 	for {
 		apiURL := fmt.Sprintf("%s?limit=%d&offset=%d", baseURL, limit, offset)
-		
+		if since != "" {
+			apiURL += fmt.Sprintf("&since=%s", since)
+			reportFunc(10, fmt.Sprintf("Mode Delta: %s", since))
+		} else {
+			reportFunc(10, "Mode Full Sync...")
+		}
+
 		reportFunc(10+(page), fmt.Sprintf("Fetching Page %d...", page))
 
-		resp, err := client.Get(apiURL)
+		req, err := http.NewRequest("GET", apiURL, nil)
 		if err != nil {
-			return fmt.Errorf("koneksi gagal: %v", err)
+			return fmt.Errorf("req error: %v", err)
 		}
-		
+
+		req.Header.Set("X-API-KEY", apiKey)
+
+		resp, err := client.Do(req)
+		if err != nil {
+			return fmt.Errorf("gagal koneksi API: %v", err)
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("API Error: Status Code %d", resp.StatusCode)
+		}
+
 		var result models.DCUserResponse
 		if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 			resp.Body.Close()
@@ -62,7 +82,7 @@ func SyncUsers(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
 		reportFunc(10+(page*2), fmt.Sprintf("Page %d selesai (%d Tersimpan, %d Gagal)", page, savedCount, failedCount))
 
 		if len(result.Data) < limit {
-			break 
+			break
 		}
 		offset += limit
 		page++
@@ -71,7 +91,7 @@ func SyncUsers(db *sqlx.DB, reportFunc func(progress int, msg string)) error {
 
 	if failedCount > 0 {
 		joinedErrors := strings.Join(errorDetails, "; ")
-		
+
 		reportFunc(100, fmt.Sprintf("⚠️ Selesai Parsial. %d Sukses, %d Gagal.", savedCount, failedCount))
 		return fmt.Errorf("%d user gagal. Detail: %s", failedCount, joinedErrors)
 	}

@@ -297,12 +297,12 @@ func UpdateUserProfile(db *sqlx.DB, userID int, address, phone, avatarPath strin
 	return err
 }
 
-func GetAdminContact(db *sqlx.DB) (*AdminContact, error){
+func GetContact(db *sqlx.DB, email string) (*AdminContact, error){
 
 	var contact AdminContact
 
-	query := `SELECT email, phone_number FROM users WHERE id = 1`
-	err := db.QueryRow(query).Scan(
+	query := `SELECT email, phone_number FROM users WHERE email = ?`
+	err := db.QueryRow(query, email).Scan(
 		&contact.Email,
 		&contact.Phone,
 	)

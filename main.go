@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/gob"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	"github.com/robfig/cron/v3"
 )
 
 func main() {
@@ -46,13 +48,7 @@ func main() {
 	}
 
 	// Inisialisasi environment untuk handler
-	env := &config.Env{
-		DB:          db,
-		Store:       sessionStore,
-		Templates:   templates,
-		SessionName: os.Getenv("SESSION_NAME"),
-		BaseURL:     os.Getenv("APP_BASE_URL"),
-	}
+	env := config.NewEnv(db, sessionStore, templates)
 
 	viewEngine := views.NewViews(env)
 
@@ -72,7 +68,23 @@ func main() {
 	redirectCtrl := redirectcontroller.NewRedirectController(env, viewEngine)
 	userCtrl := usercontroller.NewUserController(env, viewEngine)
 
-	// Inisialisasi router
+	// Setup CRON
+	c := cron.New()
+
+    // Jadwal: Tiap Jam 2 Pagi ("0 2 * * *")
+    // Jadwal Testing: Tiap 1 Menit ("* * * * *")
+    
+    c.AddFunc("@every 2m", func() {
+        fmt.Println("Memicu Cron Job...")
+        adminCtrl.RunMajorsCron()
+		adminCtrl.RunStudyProgramsCron()
+		adminCtrl.RunRolesCron()
+		adminCtrl.RunPositionsCron()
+		adminCtrl.RunUsersProgramsCron()
+    })
+    c.Start()
+
+	// Setup Router
 	r := mux.NewRouter()
 
 	uploadsFs := http.FileServer(http.Dir("./public/uploads"))
@@ -139,17 +151,19 @@ func main() {
 	adminRouter.HandleFunc("/sync/stream", adminCtrl.StreamUserSync).Methods("GET")
 	adminRouter.HandleFunc("/sync-logs", adminCtrl.SyncLogsPage).Methods("GET")
 
-	adminRouter.HandleFunc("/jurusan", adminCtrl.ListJurusan).Methods("GET")
-	adminRouter.HandleFunc("/jurusan/sync/stream", adminCtrl.StreamJurusanSync).Methods("GET")
+	adminRouter.HandleFunc("/jurusan", adminCtrl.ListMajors).Methods("GET")
+	adminRouter.HandleFunc("/jurusan/sync/stream", adminCtrl.StreamMajorsSync).Methods("GET")
 
-	adminRouter.HandleFunc("/prodi", adminCtrl.ListProdi).Methods("GET")
-	adminRouter.HandleFunc("/prodi/sync/stream", adminCtrl.StreamProdiSync).Methods("GET")
+	adminRouter.HandleFunc("/prodi", adminCtrl.ListStudyPrograms).Methods("GET")
+	adminRouter.HandleFunc("/prodi/sync/stream", adminCtrl.StreamStudyProgramsSync).Methods("GET")
 
-	adminRouter.HandleFunc("/jabatan", adminCtrl.ListJabatan).Methods("GET")
-	adminRouter.HandleFunc("/jabatan/sync/stream", adminCtrl.StreamJabatanSync).Methods("GET")
+	adminRouter.HandleFunc("/jabatan", adminCtrl.ListPositions).Methods("GET")
+	adminRouter.HandleFunc("/jabatan/sync/stream", adminCtrl.StreamPositionsSync).Methods("GET")
 
 	adminRouter.HandleFunc("/roles", adminCtrl.ListRoles).Methods("GET")
 	adminRouter.HandleFunc("/roles/sync/stream", adminCtrl.StreamRoleSync).Methods("GET")
+
+	r.HandleFunc("/api/webhook", adminCtrl.HandleWebhook).Methods("POST")
 
 	port := os.Getenv("PORT")
 	log.Printf("Server berjalan di http://localhost:%s", port)

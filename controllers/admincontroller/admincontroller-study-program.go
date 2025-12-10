@@ -3,12 +3,14 @@ package admincontroller
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sso-portal-v3/models"
 	"sso-portal-v3/services"
+	"strings"
 )
 
-func (ac *AdminController) ListProdi(w http.ResponseWriter, r *http.Request) {
+func (ac *AdminController) ListStudyPrograms(w http.ResponseWriter, r *http.Request) {
 	data, err := models.GetAllStudyPrograms(ac.env.DB)
 	if err != nil {
 		http.Error(w, "Gagal mengambil data prodi", 500)
@@ -17,7 +19,7 @@ func (ac *AdminController) ListProdi(w http.ResponseWriter, r *http.Request) {
 	ac.views.RenderPage(w, r, "admin-study-programs-list", map[string]interface{}{"Data": data})
 }
 
-func (ac *AdminController) StreamProdiSync(w http.ResponseWriter, r *http.Request) {
+func (ac *AdminController) StreamStudyProgramsSync(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Connection", "keep-alive")
@@ -43,7 +45,7 @@ func (ac *AdminController) StreamProdiSync(w http.ResponseWriter, r *http.Reques
 	}
 
 
-	err := services.SyncProdi(ac.env.DB, serviceReporter)
+	err := services.SyncStudyPrograms(ac.env, serviceReporter, "")
 
 
 	if err != nil {
@@ -52,5 +54,29 @@ func (ac *AdminController) StreamProdiSync(w http.ResponseWriter, r *http.Reques
 	} else {
 		models.CreateLog(ac.env.DB, "MANUAL", "PRODI", "SUCCESS", "Sinkronisasi Prodi Berhasil.")
 		sendJSON(map[string]interface{}{"status": "done", "log": "✨ Selesai."})
+	}
+}
+
+func (ac *AdminController) RunStudyProgramsCron() {
+	
+	log.Println("⏰ [CRON] Memulai Sync Prodi...")
+	models.CreateLog(ac.env.DB, "CRON", "PRODI", "RUNNING", "Cron job jurusan berjalan otomatis.")
+
+	lastTime, _ := models.GetLastSuccessTime(ac.env.DB, "PRODI")
+
+	cronReporter := func(progress int, msg string) {
+		if progress == 100 || strings.Contains(msg, "❌") {
+			log.Printf("[CRON PRODI] %s", msg)
+		}
+	}
+
+	err := services.SyncStudyPrograms(ac.env, cronReporter, lastTime)
+
+	if err != nil {
+		log.Printf("❌ [CRON] Prodi Gagal: %v", err)
+		models.CreateLog(ac.env.DB, "CRON", "PRODI", "ERROR", err.Error())
+	} else {
+		log.Println("✅ [CRON] Prodi Selesai.")
+		models.CreateLog(ac.env.DB, "CRON", "PRODI", "SUCCESS", "Cron job Prodi berhasil selesai.")
 	}
 }

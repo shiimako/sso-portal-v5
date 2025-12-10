@@ -42,16 +42,22 @@ func (dc *DashboardController) Index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adminContact, err := models.GetAdminContact(dc.env.DB)
+	adminContact, err := models.GetContact(dc.env.DB, dc.env.AdminEmail)
 	if err != nil {
 		log.Println("ERROR: Gagal mengambil contact admin : ", err)
 		http.Error(w, "Gagal memuat kontak admin.", http.StatusInternalServerError)
 		return
 	}
 
+	unreadErrors, err := models.CountUnreadErrors(dc.env.DB)
+    if err != nil {
+        unreadErrors = 0
+    }
+
 	dc.views.RenderPage(w, r, "dashboard", map[string]interface{}{
 		"Apps":  apps,
 		"Admin": adminContact,
+		"UnreadErrors": unreadErrors,
 	})
 
 }

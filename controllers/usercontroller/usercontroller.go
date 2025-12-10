@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sso-portal-v3/config"
 	"sso-portal-v3/models"
+	"sso-portal-v3/services"
 	"sso-portal-v3/views"
 	"strconv"
 	"strings"
@@ -68,11 +69,8 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 	user := r.Context().Value("UserLogin").(*models.FullUser)
 	userID := user.ID
 
-	// 1. Parse form (multipart karena ada file upload)
-	// Batasi ukuran upload
-	r.ParseMultipartForm(10 << 20) // 10 MB
+	r.ParseMultipartForm(10 << 20)
 
-	// 2. Ambil data teks
 	address := r.FormValue("address")
 	phone := r.FormValue("phone")
 	avatarCropped := r.FormValue("avatar-cropped")
@@ -88,7 +86,6 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 	if avatarCropped != "" && strings.Contains(avatarCropped, "base64,") {
 		parts := strings.Split(avatarCropped, ",")
 		if len(parts) == 2 {
-			// Decode base64 string
 			dec, err := base64.StdEncoding.DecodeString(parts[1])
 			if err == nil {
 				fileName := fmt.Sprintf("user-%d-avatar-%d.jpg", userID, time.Now().UnixNano())
@@ -112,14 +109,12 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 	// ---------------------------------------------------------
 	// SKENARIO B: Tidak ada crop, tapi ada file upload biasa (Fallback)
 	// ---------------------------------------------------------
-	// Hanya jalankan ini jika avatarPath masih kosong (artinya Skenario A tidak jalan/error)
 	if avatarPath == "" {
 		file, header, err := r.FormFile("avatar")
 		if err == nil {
 			defer file.Close()
 
 			ext := filepath.Ext(header.Filename)
-			// Tambahkan timestamp agar browser tidak cache gambar lama
 			fileName := fmt.Sprintf("user-%d-avatar-%d%s", userID, time.Now().UnixNano(), ext)
 			savePath := filepath.Join(saveDir, fileName)
 
@@ -147,7 +142,6 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	// 4. Update database
 	err := models.UpdateUserProfile(uc.env.DB, userID, address, phone, avatarPath)
 	if err != nil {
 		log.Printf("ERROR: Gagal update profil user %d: %v", userID, err)
@@ -155,7 +149,16 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	// 5. Redirect kembali ke dashboard dengan pesan sukses
+	changes := map[string]interface{}{
+        "address": address,
+        "phone":   phone,
+    }
+
+    if avatarPath != "" {
+        changes["avatar_url"] = uc.env.BaseURL + "/avatar/" + strconv.Itoa(userID)
+    }
+
+    services.SendUserUpdateWebhook(uc.env, user, changes)
 	http.Redirect(w, r, "/profile/edit", http.StatusFound)
 }
 
