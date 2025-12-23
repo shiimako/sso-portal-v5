@@ -40,6 +40,14 @@ func GlobalAuthMiddleware(env *config.Env) func(http.Handler) http.Handler {
 				log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 				return
 			}
+
+			if user.Status != "aktif" {
+				session.AddFlash("Akun Anda Tidak Aktif. Silahkan Hubungi Administrator.")
+				session.Save(r, w)
+				http.Redirect(w, r, "/logout", http.StatusForbidden)
+				return
+			}
+
 			role := user.Roles[0].Name
 
 			ctx := context.WithValue(r.Context(), "UserLogin", user)
