@@ -15,6 +15,7 @@ func GetAllStudyPrograms(db *sqlx.DB) ([]StudyProgram, error) {
 		SELECT sp.id, sp.study_program_name, sp.major_id, m.major_name 
 		FROM study_programs sp
 		LEFT JOIN majors m ON sp.major_id = m.id
+		WHERE sp.deleted_at IS NULL
 		ORDER BY m.major_name ASC, sp.study_program_name ASC
 	`
 	err := db.Select(&data, query)
