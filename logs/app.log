@@ -1758,3 +1758,16 @@ created by net/http.(*Server).Serve in goroutine 1
 2025/12/23 08:51:19 database.go:33: Koneksi ke database  sso_providers  berhasil.
 2025/12/23 08:51:19 main.go:202: Server berjalan di http://localhost:8080
 2025/12/23 08:51:30 authcontroller.go:143: Akses ditolak, user tidak aktif: kayazmixf617.stu@pnc.ac.id
+2025/12/23 11:27:35 main.go:26: Logger berjalan :  2025-12-23 11:27:35.4909762 +0700 +07 m=+0.005009901
+2025/12/23 11:27:35 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 11:27:35 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 11:27:59 authcontroller.go:143: Akses ditolak, user tidak aktif: kayazmixf617.stu@pnc.ac.id
+2025/12/23 11:28:02 authcontroller.go:143: Akses ditolak, user tidak aktif: kayazmixf617.stu@pnc.ac.id
+2025/12/23 11:31:35 main.go:26: Logger berjalan :  2025-12-23 11:31:35.9558237 +0700 +07 m=+0.006682301
+2025/12/23 11:31:35 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 11:31:35 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 11:31:58 main.go:26: Logger berjalan :  2025-12-23 11:31:58.071624 +0700 +07 m=+0.005096701
+2025/12/23 11:31:58 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 11:31:58 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 11:32:24 authcontroller.go:143: Akses ditolak, user tidak aktif: kayazmixf617.stu@pnc.ac.id
+2025/12/23 11:33:20 authcontroller.go:143: Akses ditolak, user tidak aktif: kayazmixf617.stu@pnc.ac.id

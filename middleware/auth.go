@@ -19,7 +19,7 @@ func GlobalAuthMiddleware(env *config.Env) func(http.Handler) http.Handler {
 			if !ok || !auth {
 				session.AddFlash("Anda harus login terlebih dahulu.")
 				session.Save(r, w)
-				http.Redirect(w, r, "/", http.StatusUnauthorized)
+				http.Redirect(w, r, "/", http.StatusSeeOther)
 				return
 			}
 
@@ -27,7 +27,7 @@ func GlobalAuthMiddleware(env *config.Env) func(http.Handler) http.Handler {
 			if !ok {
 				session.AddFlash("User ID Tidak Valid")
 				session.Save(r, w)
-				http.Redirect(w, r, "/", http.StatusBadRequest)
+				http.Redirect(w, r, "/", http.StatusSeeOther)
 				return
 			}
 
@@ -36,15 +36,19 @@ func GlobalAuthMiddleware(env *config.Env) func(http.Handler) http.Handler {
 			if err != nil {
 				session.AddFlash("Gagal Mengambil ID User, hubungi Administrator")
 				session.Save(r, w)
-				http.Redirect(w, r, "/", http.StatusInternalServerError)
+				http.Redirect(w, r, "/", http.StatusSeeOther)
 				log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 				return
 			}
 
 			if user.Status != "aktif" {
+				session.Values["authenticated"] = false
+                delete(session.Values, "user_id")
+                session.Options.MaxAge = -1
+				
 				session.AddFlash("Akun Anda Tidak Aktif. Silahkan Hubungi Administrator.")
 				session.Save(r, w)
-				http.Redirect(w, r, "/logout", http.StatusForbidden)
+				http.Redirect(w, r, "/", http.StatusSeeOther)
 				return
 			}
 
