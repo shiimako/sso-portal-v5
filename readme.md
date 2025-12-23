@@ -74,9 +74,9 @@ Karena menggunakan pendekatan Native SQL, silakan import file skema database sec
 
 1. Buat database baru di MySQL (misal: sso_providers).
 2. Download dan import schema database:
-   - [Download Schema Database](https://raw.githubusercontent.com/shiimako/sso-portal-v5/main/database/schema.sql)
+   - [Download Schema Database](database/schema.sql)
 3. (Opsional) Import data awal:
-   - [Download Seeder / Data Awal](https://raw.githubusercontent.com/shiimako/sso-portal-v5/main/database/seeder.sql)
+   - [Download Seeder / Data Awal](database/seeder.sql)
    > ⚠️ Jika menggunakan seeder, Ganti email admin dengan email anda, pastikan email tersebut aktif.
 
 ### 6. Generate Keys
