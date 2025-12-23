@@ -3,3 +3,4 @@
 # Abaikan file environment yang berisi rahasia
 .env
 /keys/private.pem
+/keys/public.pem

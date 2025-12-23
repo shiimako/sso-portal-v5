@@ -20,43 +20,35 @@ type RoleWithAccess struct {
 	AccessedApps sql.NullString `db:"accessed_apps"`
 }
 
-type DCRole struct {
-	ID          int     `json:"id_role"`
-	Name        string  `json:"nama_role"`
-	Description string  `json:"description"`
-	DeletedAt   *string `json:"deleted_at"`
-}
-
-type DCRoleResponse struct {
-	Code   int         `json:"code"`
-	Status string      `json:"status"`
-	Data   []DCRole `json:"data"`
-}
-
 func GetAllRoles(db *sqlx.DB) ([]Role, error) {
 	var data []Role
-	err := db.Select(&data, "SELECT id, role_name FROM roles ORDER BY id ASC")
+	err := db.Select(&data, "SELECT id, role_name, description FROM roles WHERE deleted_at IS NULL ORDER BY id ASC")
 	return data, err
 }
 
-func UpsertRole(db *sqlx.DB, data DCRole) error {
-	query := `
-		INSERT INTO roles 
-			(id, role_name, description, created_at, updated_at, deleted_at)
-		VALUES 
-			(:id, :name, :desc, NOW(), NOW(), :deleted_at)
-		ON DUPLICATE KEY UPDATE
-			role_name = VALUES(role_name),
-			description = VALUES(description),
-			updated_at = NOW(),
-			deleted_at = VALUES(deleted_at);
-	`
-	params := map[string]interface{}{
-		"id":         data.ID,
-		"name":       data.Name,
-		"desc":       data.Description,
-		"deleted_at": data.DeletedAt,
-	}
-	_, err := db.NamedExec(query, params)
+func FindRoleByID(db *sqlx.DB, id int) (*Role, error) {
+	var r Role
+	// Ambil role yang belum dihapus (jika pakai soft delete)
+	// Atau ambil raw jika hard delete. Kita asumsi soft delete sesuai pola sebelumnya.
+	query := "SELECT id, role_name, description FROM roles WHERE id = ? AND deleted_at IS NULL"
+	err := db.Get(&r, query, id)
+	return &r, err
+}
+
+func CreateRole(db *sqlx.DB, name, description string) error {
+	query := `INSERT INTO roles (role_name, description, created_at, updated_at) VALUES (?, ?, NOW(), NOW())`
+	_, err := db.Exec(query, name, description)
+	return err
+}
+
+func UpdateRole(db *sqlx.DB, id int, name, description string) error {
+	query := `UPDATE roles SET role_name = ?, description = ?, updated_at = NOW() WHERE id = ?`
+	_, err := db.Exec(query, name, description, id)
+	return err
+}
+
+func DeleteRole(db *sqlx.DB, id int) error {
+	query := `UPDATE roles SET deleted_at = NOW() WHERE id = ?`
+	_, err := db.Exec(query, id)
 	return err
 }

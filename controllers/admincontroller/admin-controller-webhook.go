@@ -7,8 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"net"
 	"net/http"
-	"sso-portal-v3/models"
+	"sso-portal-v5/models"
+	"sso-portal-v5/services"
+	"strings"
 )
 
 type WebhookPayload struct {
@@ -17,24 +21,39 @@ type WebhookPayload struct {
 	Data      json.RawMessage `json:"data"`      // Data dinamis (bisa User, Jurusan, dll)
 }
 
-// HandleWebhook menerima push data dari Data Center
+// HandleWebhook menerima push data 
 func (ac *AdminController) HandleWebhook(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+		log.Printf("HTTP ERROR path=%s, err=%v", r.URL.Path, "Invalid Method, Expected POST")
+		http.Error(w, "Invalid Method, Expected POST", http.StatusMethodNotAllowed)
 		return
 	}
 
 	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Gagal membaca body", http.StatusBadRequest)
+		http.Error(w, "Failed to Read Body", http.StatusBadRequest)
+		log.Printf("HTTP ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 	defer r.Body.Close()
 
-
+	senderIP := ac.getClientIP(r)
 	signature := r.Header.Get("X-Signature")
+	
 	if !ac.isValidSignature(bodyBytes, signature) {
-		models.CreateLog(ac.env.DB, "WEBHOOK", "SYSTEM", "ERROR", "Invalid Signature detected.")
+		log.Printf("SECURITY ALERT: Webhook Invalid Signature from IP=%s", senderIP)
+		
+		user, err := models.FindUserByEmail(ac.env.DB, ac.env.AdminEmail)
+		if err == nil {
+			go services.SendPushNotification(
+				ac.env,
+				user.ID,
+				"Portal Security",
+				"Unauthorized Webhook Signature Detected!",
+				ac.env.BaseURL,
+			)
+		}
+
 		http.Error(w, "Unauthorized: Invalid Signature", http.StatusForbidden)
 		return
 	}
@@ -46,84 +65,94 @@ func (ac *AdminController) HandleWebhook(w http.ResponseWriter, r *http.Request)
 	}
 
 	var processErr error
-	
+
 	switch payload.Event {
-	
-	// --- CASE: USER ---
-	case "user.created", "user.updated":
-		var user models.DCUser
-		if err := json.Unmarshal(payload.Data, &user); err != nil {
-			processErr = fmt.Errorf("gagal decode user: %v", err)
-		} else {
-			processErr = models.UpsertFullUser(ac.env.DB, user)
+
+	case "notification.push":
+		var notifData struct {
+			Email   string `json:"email"`
+			AppSlug string `json:"app_slug"`
+			Count   int    `json:"count"`
+			Message string `json:"message"`
 		}
 
-	// --- CASE: JURUSAN ---
-	case "jurusan.created", "jurusan.updated":
-		var mjr models.DCMajor
-		if err := json.Unmarshal(payload.Data, &mjr); err != nil {
-			processErr = fmt.Errorf("gagal decode jurusan: %v", err)
+		if err := json.Unmarshal(payload.Data, &notifData); err != nil {
+			processErr = fmt.Errorf("gagal decode notif: %v", err)
 		} else {
-			processErr = models.UpsertMajor(ac.env.DB, mjr)
-		}
+			// Logic: Cari User & App -> Simpan Notif -> Kirim Push (WebSocket/FCM)
+			user, err := models.FindUserByEmail(ac.env.DB, notifData.Email)
+			if err != nil {
+				processErr = fmt.Errorf("user email tidak ditemukan: %s", notifData.Email)
+			} else {
+				app, err := models.FindApplicationBySlug(ac.env.DB, notifData.AppSlug)
+				if err != nil {
+					processErr = fmt.Errorf("app slug not found: %s", notifData.AppSlug)
+				} else {
+					// Simpan ke DB
+					processErr = models.InsertNotification(ac.env.DB, user.ID, app.ID, notifData.Message)
 
-	// --- CASE: PRODI ---
-	case "prodi.created", "prodi.updated":
-		var prd models.DCStudyProgram
-		if err := json.Unmarshal(payload.Data, &prd); err != nil {
-			processErr = fmt.Errorf("gagal decode prodi: %v", err)
-		} else {
-			processErr = models.UpsertStudyPrograms(ac.env.DB, prd)
-		}
-
-	// --- CASE: ROLE ---
-	case "role.created", "role.updated":
-		var rl models.DCRole
-		if err := json.Unmarshal(payload.Data, &rl); err != nil {
-			processErr = fmt.Errorf("gagal decode role: %v", err)
-		} else {
-			processErr = models.UpsertRole(ac.env.DB, rl)
-		}
-	
-	// --- CASE: JABATAN ---
-	case "jabatan.created", "jabatan.updated":
-		var pos models.DCPosition
-		if err := json.Unmarshal(payload.Data, &pos); err != nil {
-			processErr = fmt.Errorf("gagal decode jabatan: %v", err)
-		} else {
-			processErr = models.UpsertPosition(ac.env.DB, pos)
+					// Trigger Service Push (Realtime)
+					go services.SendPushNotification(
+						ac.env,
+						user.ID,
+						app.Name,
+						notifData.Message,
+						fmt.Sprintf("%s/redirect?app=%s", ac.env.BaseURL, notifData.AppSlug),
+					)
+				}
+			}
 		}
 
 	default:
-		// Event tidak dikenal, ignore saja (200 OK)
-		fmt.Printf("Webhook event ignored: %s\n", payload.Event)
+		// Jika ada event sync (user.updated, jurusan.created, dll) masuk, kita IGNORE saja.
+		// Return 200 OK supaya Data Center tidak menganggap error dan tidak mencoba mengirim ulang.
+		log.Printf("Webhook Ignored (Standalone Mode): %s", payload.Event)
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Event Ignored"))
+		return
 	}
 
-	// 6. Logging Hasil
+	// 6. Logging Hasil Proses
 	if processErr != nil {
 		fmt.Printf("❌ Webhook Error [%s]: %v\n", payload.Event, processErr)
-		models.CreateLog(ac.env.DB, "WEBHOOK", "ALL", "ERROR", fmt.Sprintf("[%s] %v", payload.Event, processErr))
 		http.Error(w, "Processing Failed", 500)
 		return
 	}
 
 	// Sukses
-	models.CreateLog(ac.env.DB, "WEBHOOK", "ALL", "SUCCESS", fmt.Sprintf("Event %s berhasil di-sync.", payload.Event))
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Webhook Received"))
+	w.Write([]byte("Notification Received"))
 }
 
 // Helper: Cek apakah signature valid
 func (ac *AdminController) isValidSignature(body []byte, signature string) bool {
 	if ac.env.WebhookSecret == "" {
-		return true // Kalau secret kosong (dev mode), loloskan saja (hati-hati di prod!)
+		return true
 	}
-	
+
 	mac := hmac.New(sha256.New, []byte(ac.env.WebhookSecret))
 	mac.Write(body)
 	expectedMAC := mac.Sum(nil)
 	expectedSig := hex.EncodeToString(expectedMAC)
 
-	// Compare aman (timing attack safe)
 	return hmac.Equal([]byte(signature), []byte(expectedSig))
+}
+
+// Helper: Ambil IP Client
+func (ac *AdminController) getClientIP(r *http.Request) string {
+	forwarded := r.Header.Get("X-Forwarded-For")
+	if forwarded != "" {
+		return strings.Split(forwarded, ",")[0]
+	}
+
+	realIP := r.Header.Get("X-Real-Ip")
+	if realIP != "" {
+		return realIP
+	}
+
+	ip, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return ip
 }

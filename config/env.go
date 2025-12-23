@@ -23,6 +23,11 @@ type Env struct {
 	DataCenterKey string
 	WebhookSecret string
 
+	// VAPID Config
+	VapidPrivateKey string
+	VapidPublicKey string
+	VapidSubject string
+
 }
 
 func NewEnv(db *sqlx.DB, store *sessions.CookieStore, templates map[string]*template.Template) *Env {
@@ -44,6 +49,11 @@ func NewEnv(db *sqlx.DB, store *sessions.CookieStore, templates map[string]*temp
 		DataCenterURL: dcURL,
 		DataCenterKey: os.Getenv("DATA_CENTER_KEY"),
 		WebhookSecret: os.Getenv("WEBHOOK_SECRET"),
+
+		// Load VAPID Config
+		VapidPrivateKey: os.Getenv("VAPID_PRIVATE_KEY"),
+		VapidPublicKey: os.Getenv("VAPID_PUBLIC_KEY"),
+		VapidSubject: os.Getenv("VAPID_SUBJECT"),
 	}
 }
 

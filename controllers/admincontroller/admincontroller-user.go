@@ -1,19 +1,17 @@
 package admincontroller
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"sso-portal-v3/models"
-	"sso-portal-v3/services"
+	"sso-portal-v5/models"
 	"strconv"
-	"strings"
 
 	"github.com/gorilla/mux"
 )
 
-// ListUsers menampilkan daftar semua pengguna.
 func (ac *AdminController) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	pageStr := r.URL.Query().Get("page")
@@ -40,11 +38,10 @@ func (ac *AdminController) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	users, err := models.GetAllUsers(ac.env.DB, page, limit, search, role)
 	if err != nil {
-		http.Error(w, "Gagal mengambil data pengguna", http.StatusInternalServerError)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
-
-	unreadErrors, _ := models.CountUnreadErrors(ac.env.DB)
 
 	pageData := map[string]interface{}{
 		"Users":        users,
@@ -52,25 +49,28 @@ func (ac *AdminController) ListUsers(w http.ResponseWriter, r *http.Request) {
 		"Limit":        limit,
 		"Search":       search,
 		"Role":         role,
-		"UnreadErrors": unreadErrors,
 	}
 
 	ac.views.RenderPage(w, r, "admin-user-list", pageData)
 }
 
-// DetailUser menampilkan halaman detail read-only untuk seorang pengguna.
 func (ac *AdminController) DetailUser(w http.ResponseWriter, r *http.Request) {
 	idstr := mux.Vars(r)["id"]
 
 	id, err := strconv.Atoi(idstr)
 	if err != nil {
-		http.Error(w, "ID pengguna tidak valid", http.StatusBadRequest)
+		ac.RenderError(w, r, http.StatusBadRequest, "ID Pengguna tidak Valid.")
 		return
 	}
 
 	user, err := models.FindUserByID(ac.env.DB, id)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Gagal mengambil data pengguna: %v", err), http.StatusInternalServerError)
+		if err == sql.ErrNoRows {
+			ac.RenderError(w, r, http.StatusNotFound, "Data Pengguna Tidak Ditemukan")
+			return
+		}
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
@@ -103,7 +103,8 @@ func (ac *AdminController) DetailUser(w http.ResponseWriter, r *http.Request) {
 	if role == "dosen" {
 		positionsDetails, err := models.GetLecturerPositionsByLecturerID(ac.env.DB, user.Lecturer.ID)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("Gagal mengambil data posisi dosen: %v", err), http.StatusInternalServerError)
+			ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+			log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 			return
 		}
 
@@ -126,64 +127,162 @@ func (ac *AdminController) DetailUser(w http.ResponseWriter, r *http.Request) {
 	ac.views.RenderPage(w, r, "admin-user-detail", data)
 }
 
-// StreamUserSync menangani SSE untuk User
-func (ac *AdminController) StreamUserSync(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+func (ac *AdminController) NewUserForm(w http.ResponseWriter, r *http.Request) {
+	roles, _ := models.GetAllRoles(ac.env.DB)
+	positions, _ := models.GetAllPositions(ac.env.DB)
+	majors, _ := models.GetAllMajors(ac.env.DB)
+	prodis, _ := models.GetAllStudyPrograms(ac.env.DB)
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", 500)
+	ac.views.RenderPage(w, r, "admin-user-form", map[string]interface{}{
+		"IsEdit":          false,
+		"Roles":           roles,
+		"MasterPositions": positions,
+		"MasterMajors":    majors,
+		"MasterProdis":    prodis,
+	})
+}
+
+func (ac *AdminController) CreateUser(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Gagal parse form", 400)
 		return
 	}
 
-	sendJSON := func(data map[string]interface{}) {
-		jsonMsg, _ := json.Marshal(data)
-		fmt.Fprintf(w, "data: %s\n\n", jsonMsg)
-		flusher.Flush()
+	roleID, _ := strconv.Atoi(r.FormValue("role_id"))
+	var roleName string
+	ac.env.DB.Get(&roleName, "SELECT role_name FROM roles WHERE id = ?", roleID)
+
+	form := models.UserForm{
+		Name:     r.FormValue("name"),
+		Email:    r.FormValue("email"),
+		Status:   r.FormValue("status"),
+		RoleID:   roleID,
+		RoleName: roleName,
+		Address:  models.GetPtr(r.FormValue("address")),
+		Phone:    models.GetPtr(r.FormValue("phone")),
+		NIM:      models.GetPtr(r.FormValue("nim")),
+		NIP:      models.GetPtr(r.FormValue("nip")),
+		NUPTK:    models.GetPtr(r.FormValue("nuptk")),
 	}
+    if form.Status == "" { form.Status = "active" }
 
-	models.CreateLog(ac.env.DB, "MANUAL", "USER", "RUNNING", "Memulai sync User.")
-
-	serviceReporter := func(progress int, msg string) {
-		if progress >= 100 {
-			progress = 99
-		}
-		sendJSON(map[string]interface{}{"progress": progress, "log": msg, "status": "running"})
-	}
-
-	err := services.SyncUsers(ac.env, serviceReporter, "")
-
+	positions, err := models.ParseLecturerPositions(r.FormValue("positions_json"))
 	if err != nil {
-		models.CreateLog(ac.env.DB, "MANUAL", "USER", "ERROR", err.Error())
-		sendJSON(map[string]interface{}{"status": "error", "message": err.Error(), "log": "❌ Gagal."})
-	} else {
-		models.CreateLog(ac.env.DB, "MANUAL", "USER", "SUCCESS", "Sync User Berhasil.")
-		sendJSON(map[string]interface{}{"status": "done", "log": "✨ Selesai."})
+		http.Error(w, "Format Jabatan Error", 400)
+		return
 	}
+	form.Positions = positions
+
+	_, err = models.CreateUser(ac.env.DB, form)
+	if err != nil {
+		ac.RenderError(w, r, http.StatusBadRequest, "Email sudah digunakan!!")
+		return
+	}
+
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
 
-func (ac *AdminController) RunUsersProgramsCron() {
+func (ac *AdminController) EditUserForm(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	user, err := models.FindUserByID(ac.env.DB, id)
+	if err != nil {
+		http.Error(w, "User not found", 404)
+		return
+	}
 
-	log.Println("⏰ [CRON] Memulai Sync Users...")
-	models.CreateLog(ac.env.DB, "CRON", "USER", "RUNNING", "Cron job jurusan berjalan otomatis.")
+	roles, _ := models.GetAllRoles(ac.env.DB)
+	positions, _ := models.GetAllPositions(ac.env.DB)
+	majors, _ := models.GetAllMajors(ac.env.DB)
+	prodis, _ := models.GetAllStudyPrograms(ac.env.DB)
 
-	lastTime, _ := models.GetLastSuccessTime(ac.env.DB, "USER")
 
-	cronReporter := func(progress int, msg string) {
-		if progress == 100 || strings.Contains(msg, "❌") {
-			log.Printf("[CRON USER] %s", msg)
+	var existingPosJSON []models.PositionFormJSON
+	if user.Positions != nil {
+		for _, p := range user.Positions {
+			item := models.PositionFormJSON{
+				PositionID: p.PositionID,
+				Scope:      "none",
+			}
+            
+			if p.StartDate != nil {
+				item.StartDate = *p.StartDate
+			}
+			if p.EndDate != nil {
+				item.EndDate = *p.EndDate
+			}
+
+			if p.MajorID.Valid {
+				item.Scope = "major"
+				item.MajorID = int(p.MajorID.Int64)
+			} else if p.StudyProgramID.Valid {
+				item.Scope = "prodi"
+				item.ProdiID = int(p.StudyProgramID.Int64)
+			}
+			existingPosJSON = append(existingPosJSON, item)
 		}
 	}
+	posBytes, _ := json.Marshal(existingPosJSON)
+    if len(existingPosJSON) == 0 { posBytes = []byte("[]") }
 
-	err := services.SyncUsers(ac.env, cronReporter, lastTime)
+	ac.views.RenderPage(w, r, "admin-user-form", map[string]interface{}{
+		"IsEdit":           true,
+		"User":             user,
+		"Roles":            roles,
+		"MasterPositions":  positions,
+		"MasterMajors":     majors,
+		"MasterProdis":     prodis,
+		"CurrentPositions": string(posBytes),
+	})
+}
 
-	if err != nil {
-		log.Printf("❌ [CRON] User Gagal: %v", err)
-		models.CreateLog(ac.env.DB, "CRON", "USER", "ERROR", err.Error())
-	} else {
-		log.Println("✅ [CRON] User Selesai.")
-		models.CreateLog(ac.env.DB, "CRON", "USER", "SUCCESS", "Cron job USER berhasil selesai.")
+func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	r.ParseForm()
+
+	roleID, _ := strconv.Atoi(r.FormValue("role_id"))
+	var roleName string
+	ac.env.DB.Get(&roleName, "SELECT role_name FROM roles WHERE id = ?", roleID)
+
+	form := models.UserForm{
+		ID:       id,
+		Name:     r.FormValue("name"),
+		Email:    r.FormValue("email"),
+		Status:   r.FormValue("status"),
+		RoleID:   roleID,
+		RoleName: roleName,
+		Address:  models.GetPtr(r.FormValue("address")),
+		Phone:    models.GetPtr(r.FormValue("phone")),
+		NIM:      models.GetPtr(r.FormValue("nim")),
+		NIP:      models.GetPtr(r.FormValue("nip")),
+		NUPTK:    models.GetPtr(r.FormValue("nuptk")),
 	}
+
+	positions, err := models.ParseLecturerPositions(r.FormValue("positions_json"))
+	if err != nil {
+		http.Error(w, "Format Jabatan Error", 400)
+		return
+	}
+	form.Positions = positions
+
+	err = models.UpdateUser(ac.env.DB, form)
+	if err != nil {
+		http.Error(w, "Gagal update: "+err.Error(), 500)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+}
+
+func (ac *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"])
+
+	err := models.DeleteUser(ac.env.DB, id)
+	if err != nil {
+		fmt.Printf("Error Delete User: %v\n", err)
+		http.Error(w, "Gagal menghapus user", 500)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }

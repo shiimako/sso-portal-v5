@@ -7,40 +7,33 @@ type Position struct {
 	Name string `db:"position_name"`
 }
 
-type DCPositionResponse struct {
-	Code   int         `json:"code"`
-	Status string      `json:"status"`
-	Data   []DCPosition `json:"data"`
-}
-
-type DCPosition struct {
-	ID        int     `json:"id_jabatan"`
-	Name      string  `json:"nama_jabatan"`
-	DeletedAt *string `json:"deleted_at"`
-}
-
 func GetAllPositions(db *sqlx.DB) ([]Position, error) {
 	var data []Position
 	err := db.Select(&data, "SELECT id, position_name FROM positions ORDER BY position_name ASC")
 	return data, err
 }
 
-func UpsertPosition(db *sqlx.DB, data DCPosition) error {
-	query := `
-		INSERT INTO positions 
-			(id, position_name, created_at, updated_at, deleted_at)
-		VALUES 
-			(:id, :name, NOW(), NOW(), :deleted_at)
-		ON DUPLICATE KEY UPDATE
-			position_name = VALUES(position_name),
-			updated_at = NOW(),
-			deleted_at = VALUES(deleted_at);
-	`
-	params := map[string]interface{}{
-		"id":         data.ID,
-		"name":       data.Name,
-		"deleted_at": data.DeletedAt,
-	}
-	_, err := db.NamedExec(query, params)
+func FindPositionByID(db *sqlx.DB, id int) (*Position, error) {
+	var p Position
+	query := "SELECT id, position_name FROM positions WHERE id = ? AND deleted_at IS NULL"
+	err := db.Get(&p, query, id)
+	return &p, err
+}
+
+func CreatePosition(db *sqlx.DB, name string) error {
+	query := `INSERT INTO positions (position_name, created_at, updated_at) VALUES (?, NOW(), NOW())`
+	_, err := db.Exec(query, name)
+	return err
+}
+
+func UpdatePosition(db *sqlx.DB, id int, name string) error {
+	query := `UPDATE positions SET position_name = ?, updated_at = NOW() WHERE id = ?`
+	_, err := db.Exec(query, name, id)
+	return err
+}
+
+func DeletePosition(db *sqlx.DB, id int) error {
+	query := `UPDATE positions SET deleted_at = NOW() WHERE id = ?`
+	_, err := db.Exec(query, id)
 	return err
 }

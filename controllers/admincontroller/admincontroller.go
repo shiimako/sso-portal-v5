@@ -1,12 +1,9 @@
-// file: controllers/admincontroller/admincontroller.go
-
 package admincontroller
 
 import (
 	"net/http"
-	"sso-portal-v3/config" // Sesuaikan path
-	"sso-portal-v3/models"
-	"sso-portal-v3/views"
+	"sso-portal-v5/config"
+	"sso-portal-v5/views"
 )
 
 type AdminController struct {
@@ -20,15 +17,18 @@ func NewAdminController(env *config.Env, v *views.Views) *AdminController {
 
 // Dashboard menampilkan halaman utama panel admin.
 func (ac *AdminController) Dashboard(w http.ResponseWriter, r *http.Request) {
-	
-	unreadErrors, err := models.CountUnreadErrors(ac.env.DB)
-    if err != nil {
-        unreadErrors = 0
+
+
+	ac.views.RenderPage(w, r, "admin-dashboard", map[string]interface{}{})
+}
+
+func (ac *AdminController) RenderError(w http.ResponseWriter, r *http.Request, code int, message string) {
+    w.WriteHeader(code)
+    
+    data := map[string]interface{}{
+        "Code":    code,
+        "Message": message,
     }
-
-	pageData := map[string]interface{}{
-		"UnreadErrors": unreadErrors,
-	}
-
-	ac.views.RenderPage(w, r, "admin-dashboard", pageData)
+    
+    ac.views.RenderPage(w, r, "error", data)
 }

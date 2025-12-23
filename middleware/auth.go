@@ -4,8 +4,9 @@ import (
 	"context"
 	"log"
 	"net/http"
-	"sso-portal-v3/config"
-	"sso-portal-v3/models"
+	"sso-portal-v5/config"
+	"sso-portal-v5/models"
+	"sso-portal-v5/views"
 )
 
 func GlobalAuthMiddleware(env *config.Env) func(http.Handler) http.Handler {
@@ -18,20 +19,25 @@ func GlobalAuthMiddleware(env *config.Env) func(http.Handler) http.Handler {
 			if !ok || !auth {
 				session.AddFlash("Anda harus login terlebih dahulu.")
 				session.Save(r, w)
-				http.Redirect(w, r, "/", http.StatusFound)
+				http.Redirect(w, r, "/", http.StatusUnauthorized)
 				return
 			}
 
 			rawID, ok := session.Values["user_id"]
 			if !ok {
-				http.Error(w, "User ID tidak valid", http.StatusUnauthorized)
+				session.AddFlash("User ID Tidak Valid")
+				session.Save(r, w)
+				http.Redirect(w, r, "/", http.StatusBadRequest)
 				return
 			}
 
 			userID := rawID.(int)
 			user, err := models.FindUserByID(env.DB, userID)
 			if err != nil {
-				http.Error(w, "Gagal mengambil data user", http.StatusInternalServerError)
+				session.AddFlash("Gagal Mengambil ID User, hubungi Administrator")
+				session.Save(r, w)
+				http.Redirect(w, r, "/", http.StatusInternalServerError)
+				log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 				return
 			}
 			role := user.Roles[0].Name
@@ -44,32 +50,24 @@ func GlobalAuthMiddleware(env *config.Env) func(http.Handler) http.Handler {
 	}
 }
 
-func AdminMiddleware(env *config.Env) func(http.Handler) http.Handler {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func AdminMiddleware(env *config.Env, v *views.Views) func(http.Handler) http.Handler {
+    return func(next http.Handler) http.Handler {
+        return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			// 1. Ambil data user dari context (hasil GlobalAuthMiddleware)
-			userLogin, ok := r.Context().Value("UserLogin").(*models.FullUser)
-			if !ok || userLogin == nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				log.Println("userLogin : ", userLogin)
-				return
-			}
+            roleVal := r.Context().Value("ActiveRole")
+            role, ok := roleVal.(string)
 
-			role, ok := r.Context().Value("ActiveRole").(string)
-			if !ok {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				log.Println("role : ", role)
-				return
-			}
+            if !ok || role != "admin" {
+                w.WriteHeader(http.StatusForbidden)
+                data := map[string]interface{}{
+                    "Code":    http.StatusForbidden,
+                    "Message": "Akses ditolak. Anda tidak memiliki izin Administrator untuk mengakses halaman ini.",
+                }
+                v.RenderPage(w, r, "error", data) 
+                return
+            }
 
-			// 2. Cek role
-			if role != "admin" {
-				http.Error(w, "Akses ditolak. Halaman ini hanya untuk admin.", http.StatusForbidden)
-				return
-			}
-
-			next.ServeHTTP(w, r)
-		})
-	}
+            next.ServeHTTP(w, r)
+        })
+    }
 }

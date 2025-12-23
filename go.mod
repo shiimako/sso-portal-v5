@@ -1,4 +1,4 @@
-module sso-portal-v3
+module sso-portal-v5
 
 go 1.25.1
 
@@ -16,5 +16,8 @@ require (
 require (
 	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
+	github.com/SherClockHolmes/webpush-go v1.4.0 // indirect
 	github.com/gorilla/securecookie v1.1.2 // indirect
+	golang.org/x/crypto v0.31.0 // indirect
+	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
 )

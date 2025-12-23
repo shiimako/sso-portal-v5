@@ -16,7 +16,7 @@ func InitDB() (*sqlx.DB, error) {
 	dbHost := os.Getenv("DB_HOST")
 	dbName := os.Getenv("DB_NAME")
 
-	// Bikin connection string MySQL (user:pass@tcp(host)/dbname)
+	// Connection (user:pass@tcp(host)/dbname)
 	dsn := fmt.Sprintf("%s:%s@tcp(%s)/%s?parseTime=true", dbUser, dbPass, dbHost, dbName)
 
 	db, err := sqlx.Open("mysql", dsn)
@@ -24,10 +24,9 @@ func InitDB() (*sqlx.DB, error) {
 		return nil, fmt.Errorf("gagal membuka koneksi database: %w", err)
 	}
 
-	// Lakukan ping untuk memastikan database benar-benar terhubung
 	err = db.Ping()
 	if err != nil {
-		db.Close() // Tutup koneksi jika ping gagal
+		db.Close()
 		return nil, fmt.Errorf("database tidak dapat dijangkau: %w", err)
 	}
 

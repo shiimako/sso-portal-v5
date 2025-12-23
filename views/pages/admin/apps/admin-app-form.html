@@ -1,54 +1,66 @@
 {{define "content"}}
 
-<!-- Gunakan x-data untuk state management form -->
 <div x-data="appForm()" class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-md">
 
-    <!-- Title -->
     <h2 class="text-2xl font-semibold mb-1 flex items-center gap-2">
         <i data-lucide="app-window" class="w-6 h-6 text-gray-700"></i>
         Tambah Aplikasi Baru
     </h2>
     <p class="text-gray-600 mb-6">Isi data berikut untuk mendaftarkan aplikasi baru.</p>
 
-    <form action="/admin/applications/create" method="POST" enctype="multipart/form-data" class="space-y-6">
+    <form action="/admin/application/create" method="POST" enctype="multipart/form-data" class="space-y-6">
 
-        <!-- Nama & Slug (Auto Generate) -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
                 <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
                     <i data-lucide="badge-info" class="w-4 h-4"></i>
                     Nama Aplikasi
                 </label>
-                <!-- Binding x-model untuk trigger auto slug -->
                 <input 
-                    type="text" 
-                    name="name" 
-                    x-model="name" 
-                    @input="generateSlug()"
+                    type="text" name="name" x-model="name" @input="generateSlug()"
                     class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" 
-                    placeholder="Contoh: Sistem Akademik"
-                    required 
+                    placeholder="Contoh: Sistem Akademik" required 
                 />
             </div>
 
             <div>
                 <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
                     <i data-lucide="hash" class="w-4 h-4"></i>
-                    Slug (URL Friendly)
+                    Slug
                 </label>
                 <input 
-                    type="text" 
-                    name="slug" 
-                    x-model="slug"
+                    type="text" name="slug" x-model="slug"
                     class="w-full p-3 border rounded-md bg-gray-50 text-gray-600" 
-                    placeholder="contoh: sistem-akademik"
-                    required 
+                    placeholder="contoh: sistem-akademik" required 
                 />
-                <p class="text-xs text-gray-500 mt-1">Otomatis dibuat dari nama aplikasi.</p>
             </div>
         </div>
 
-        <!-- Deskripsi -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                    <i data-lucide="link" class="w-4 h-4"></i>
+                    Target URL
+                </label>
+                <input type="url" name="target_url" class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://..." required />
+            </div>
+
+            <div>
+                <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
+                    <i data-lucide="tag" class="w-4 h-4"></i>
+                    Kategori
+                </label>
+                <div class="relative">
+                    <select name="category_id" class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none appearance-none bg-white">
+                        {{range .Data.Categories}}
+                        <option value="{{.ID}}">{{.Name}}</option>
+                        {{end}}
+                    </select>
+                    <i data-lucide="chevron-down" class="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none"></i>
+                </div>
+            </div>
+        </div>
+
         <div>
             <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
                 <i data-lucide="align-left" class="w-4 h-4"></i>
@@ -57,24 +69,12 @@
             <textarea name="description" class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" rows="3" placeholder="Jelaskan fungsi aplikasi ini..."></textarea>
         </div>
 
-        <!-- Target URL -->
-        <div>
-            <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
-                <i data-lucide="link" class="w-4 h-4"></i>
-                Target URL
-            </label>
-            <input type="url" name="target_url" class="w-full p-3 border rounded-md focus:ring-2 focus:ring-blue-500 outline-none" placeholder="https://..." required />
-        </div>
-
-        <!-- Icon File dengan Preview -->
         <div>
             <label class="font-semibold text-gray-700 flex items-center gap-2 mb-1">
                 <i data-lucide="image-up" class="w-4 h-4"></i>
                 Icon Aplikasi
             </label>
-
             <div class="flex items-start gap-4 mt-2">
-                <!-- Preview Image Box -->
                 <div class="w-24 h-24 border-2 border-dashed rounded-lg flex items-center justify-center bg-gray-50 overflow-hidden shrink-0">
                     <template x-if="imageUrl">
                         <img :src="imageUrl" class="w-full h-full object-cover">
@@ -83,34 +83,22 @@
                         <span class="text-gray-400 text-xs text-center p-1">No Image</span>
                     </template>
                 </div>
-
                 <div class="flex-1">
-                    <input 
-                        type="file" 
-                        name="icon_file" 
-                        accept=".png,.jpg,.jpeg,.svg" 
-                        @change="fileChosen"
-                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-                    />
+                    <input type="file" name="icon_file" accept=".png,.jpg,.jpeg,.svg" @change="fileChosen"
+                        class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
                     <p class="text-sm text-gray-500 mt-2">Format: PNG, JPG, JPEG, SVG. Max 2MB.</p>
                 </div>
             </div>
         </div>
 
-        <!-- Roles & Positions Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <!-- Roles -->
             <div class="bg-gray-50 p-4 rounded-lg border">
                 <div class="flex justify-between items-center mb-3">
                     <label class="font-semibold text-gray-700 flex items-center gap-2">
-                        <i data-lucide="users" class="w-4 h-4"></i>
-                        Akses Peran
+                        <i data-lucide="users" class="w-4 h-4"></i> Akses Peran
                     </label>
-                    <button type="button" @click="toggleAllRoles()" class="text-xs text-blue-600 hover:underline">
-                        Pilih Semua
-                    </button>
+                    <button type="button" @click="toggleAllRoles()" class="text-xs text-blue-600 hover:underline">Pilih Semua</button>
                 </div>
-                
                 <div class="max-h-48 overflow-y-auto space-y-2 pr-2">
                     {{range .Data.Roles}}
                     <label class="flex items-center gap-2 bg-white px-3 py-2 rounded border cursor-pointer hover:bg-blue-50 transition">
@@ -120,19 +108,13 @@
                     {{end}}
                 </div>
             </div>
-
-            <!-- Positions -->
             <div class="bg-gray-50 p-4 rounded-lg border">
                 <div class="flex justify-between items-center mb-3">
                     <label class="font-semibold text-gray-700 flex items-center gap-2">
-                        <i data-lucide="briefcase" class="w-4 h-4"></i>
-                        Akses Jabatan
+                        <i data-lucide="briefcase" class="w-4 h-4"></i> Akses Jabatan
                     </label>
-                    <button type="button" @click="toggleAllPositions()" class="text-xs text-blue-600 hover:underline">
-                        Pilih Semua
-                    </button>
+                    <button type="button" @click="toggleAllPositions()" class="text-xs text-blue-600 hover:underline">Pilih Semua</button>
                 </div>
-
                 <div class="max-h-48 overflow-y-auto space-y-2 pr-2">
                     {{range .Data.Position}}
                     <label class="flex items-center gap-2 bg-white px-3 py-2 rounded border cursor-pointer hover:bg-blue-50 transition">
@@ -144,61 +126,38 @@
             </div>
         </div>
 
-        <!-- Submit -->
         <div class="pt-4 border-t">
             <button type="submit" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md shadow flex items-center justify-center gap-2 transition">
-                <i data-lucide="save" class="w-4 h-4"></i>
-                Simpan Aplikasi
+                <i data-lucide="save" class="w-4 h-4"></i> Simpan Aplikasi
             </button>
         </div>
-
     </form>
 
-    <!-- Back -->
     <div class="mt-6 text-center sm:text-left">
-        <a href="/admin/applications"
-           class="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm">
-            <i data-lucide="arrow-left" class="w-4 h-4"></i>
-            Kembali ke Daftar Aplikasi
+        <a href="/admin/applications" class="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 text-sm">
+            <i data-lucide="arrow-left" class="w-4 h-4"></i> Kembali ke Daftar Aplikasi
         </a>
     </div>
-
 </div>
 
-<!-- Alpine Logic -->
 <script>
     function appForm() {
         return {
             name: '',
             slug: '',
             imageUrl: null,
-
-            // Logic 1: Auto Generate Slug
             generateSlug() {
-                this.slug = this.name
-                    .toLowerCase()
-                    .replace(/[^a-z0-9\s-]/g, '') 
-                    .trim()
-                    .replace(/\s+/g, '-')         
-                    .replace(/-+/g, '-');        
+                this.slug = this.name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').trim().replace(/\s+/g, '-').replace(/-+/g, '-');
             },
-
-            // Logic 2: Image Preview
             fileChosen(event) {
                 const file = event.target.files[0];
-                if (file) {
-                    this.imageUrl = URL.createObjectURL(file);
-                }
+                if (file) this.imageUrl = URL.createObjectURL(file);
             },
-
-            // Logic 3: Toggle Checkboxes (Pilih Semua)
             toggleAllRoles() {
                 const checkboxes = document.querySelectorAll('.role-checkbox');
-                // Cek apakah ada satu yang belum check? Jika ya, check semua. Jika semua checked, uncheck semua.
                 const allChecked = Array.from(checkboxes).every(c => c.checked);
                 checkboxes.forEach(c => c.checked = !allChecked);
             },
-
             toggleAllPositions() {
                 const checkboxes = document.querySelectorAll('.position-checkbox');
                 const allChecked = Array.from(checkboxes).every(c => c.checked);
@@ -207,5 +166,4 @@
         }
     }
 </script>
-
 {{end}}

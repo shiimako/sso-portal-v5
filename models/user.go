@@ -2,22 +2,21 @@ package models
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"strings"
-	"time"
 
 	"github.com/jmoiron/sqlx"
 )
 
 type User struct {
-	ID     int            `db:"id"`
-	Name   string         `db:"name"`
-	Email  string         `db:"email"`
-	Status string         `db:"status"`
-	Avatar sql.NullString `db:"avatar"`
+	ID           int            `db:"id"`
+	Name         string         `db:"name"`
+	Email        string         `db:"email"`
+	Status       string         `db:"status"`
+	Avatar       sql.NullString `db:"avatar"`
 	GoogleAvatar sql.NullString `db: "googleavatar"`
-	Address sql.NullString `db:"address"`
-	Phone sql.NullString `db:"address"`
+	Address      sql.NullString `db:"address"`
+	Phone        sql.NullString `db:"address"`
 }
 type UserRole struct {
 	RoleID int    `db:"role_id"`
@@ -40,62 +39,30 @@ type UserListItem struct {
 }
 
 type AdminContact struct {
-	Phone string 
+	Phone string
 	Email string
 }
 
-type DCUserResponse struct {
-	Code   int      `json:"code"`
-	Status string   `json:"status"`
-	Data   []DCUser `json:"data"`
+type UserForm struct {
+	ID       int
+	Name     string
+	Email    string
+	RoleID   int
+	RoleName string
+	Status   string
+	Address  *string
+	Phone    *string
+
+	NIM   *string
+	NIP   *string
+	NUPTK *string
+
+	Positions []LecturerPosition
 }
 
-type DCUser struct {
-	ID        int     `json:"id_user"`
-	Name      string  `json:"nama_lengkap"`
-	Email     string  `json:"email"`
-	Status    string  `json:"status"`
-	UpdatedAt string  `json:"updated_at"`
-	DeletedAt *string `json:"deleted_at"`
-
-
-	RoleObj *struct {
-		ID   int    `json:"id_role"`
-		Nama string `json:"nama"`
-	} `json:"role"`
-	RoleID *int `json:"id_role"`
-
-	// Profile
-	Profile struct {
-		Address string `json:"alamat"`
-		AddressAlt string `json:"id_alamat"`
-		Phone   string `json:"no_hp"`
-	} `json:"profile"`
-
-	Academic DCAcademic `json:"academic"`
-}
-
-type DCAcademic struct {
-
-	NIM *string `json:"nim"`
-	
-
-	NIP   *string `json:"nip"`
-	NUPTK *string `json:"nuptk"`
-	
-
-	Positions []DCLecturerPos `json:"jabatan_dosen"`
-}
-
-type DCLecturerPos struct {
-	IDJabatan  int     `json:"id_jabatan"`
-	IDJurusan  *int    `json:"id_jurusan"` 
-	IDProdi    *int    `json:"id_prodi"`
-	StartDate  string  `json:"tanggal_mulai"`   // Format: "16-02-2021"
-	EndDate    *string `json:"tanggal_selesai"` // Format: "16-02-2025"
-	Status     string  `json:"status"`
-}
-
+// =================
+// READ & FIND FUNCTIONS
+// =================
 func FindUserByEmail(db *sqlx.DB, email string) (*FullUser, error) {
 
 	query := `SELECT u.id, u.name, u.email, u.status, u.avatar, u.google_avatar, u.address, u.phone_number,
@@ -193,7 +160,6 @@ func FindUserByID(db *sqlx.DB, id int) (*FullUser, error) {
 
 	fu.Roles = append(fu.Roles, role)
 
-
 	if role.Name == "mahasiswa" {
 		var s Student
 		err := db.Get(&s, "SELECT id, user_id, nim FROM students WHERE user_id = ?", fu.ID)
@@ -217,6 +183,138 @@ func FindUserByID(db *sqlx.DB, id int) (*FullUser, error) {
 	return &fu, nil
 }
 
+func GetAllUsers(db *sqlx.DB, page, pagesize int, search, role string) ([]UserListItem, error) {
+
+	offset := (page - 1) * pagesize
+
+	query := `
+        SELECT 
+            u.id, 
+            u.name, 
+            u.email, 
+            u.status, 
+            r.role_name AS role
+        FROM users u
+        JOIN user_roles ur ON ur.user_id = u.id
+        JOIN roles r ON r.id = ur.role_id
+        WHERE u.deleted_at IS NULL
+    `
+
+	args := []interface{}{}
+
+	if search != "" {
+		query += " AND u.name LIKE ? "
+		args = append(args, "%"+search+"%")
+	}
+
+	if role != "" {
+		query += " AND r.role_name = ? "
+		args = append(args, role)
+	}
+
+	query += `
+        ORDER BY u.id ASC
+        LIMIT ? OFFSET ?
+    `
+	args = append(args, pagesize, offset)
+
+	var users []UserListItem
+	err := db.Select(&users, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func GetContact(db *sqlx.DB, email string) (*AdminContact, error) {
+
+	var contact AdminContact
+
+	query := `SELECT email, phone_number FROM users WHERE email = ?`
+	err := db.QueryRow(query, email).Scan(
+		&contact.Email,
+		&contact.Phone,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	return &contact, nil
+}
+
+// =================
+// CREATE FUNCTIONS
+// =================
+func CreateUser(db *sqlx.DB, form UserForm) (int64, error) {
+
+	tx, err := db.Beginx()
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+
+	query := `INSERT INTO users (name, email, status, address, phone_number) VALUES (?, ?, ?, ?, ?)`
+	res, err := tx.Exec(query, form.Name, form.Email, form.Status, form.Address, form.Phone)
+	if err != nil {
+		return 0, err
+	}
+
+	userID, err := res.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	if form.RoleID != 0 {
+		_, err = tx.Exec(`INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)`, userID, form.RoleID)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if form.RoleName == "mahasiswa" {
+		query = `INSERT INTO students (user_id, nim) VALUES (?, ?)`
+		_, err := tx.Exec(query, userID, form.NIM)
+		if err != nil {
+			return 0, err
+		}
+	} else if form.RoleName == "dosen" {
+		query = `INSERT INTO lecturers (user_id, nip, nuptk) VALUES (?, ?, ?)`
+		res2, err := tx.Exec(query, userID, form.NIP, form.NUPTK)
+		if err != nil {
+			return 0, err
+		}
+		lecturerID, err := res2.LastInsertId()
+		if err != nil {
+			return 0, err
+		}
+		for _, pos := range form.Positions {
+			_, err = tx.Exec(`INSERT INTO lecturer_positions (lecturer_id, position_id, major_id, study_program_id, start_date, end_date) 
+			VALUES (?, ?, ?, ?, ?, ?)`,
+				lecturerID, pos.PositionID, pos.MajorID, pos.StudyProgramID, pos.StartDate, pos.EndDate)
+			if err != nil {
+				return 0, err
+			}
+		}
+	}
+	err = tx.Commit()
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
+}
+
+// =================
+// UPDATE FUNCTIONS
+// =================
+
 func UpdateUserAvatar(db *sqlx.DB, userID int, avatarURL string) error {
 	res, err := db.Exec(`
         UPDATE users SET avatar = ?, google_avatar = ?, updated_at = NOW() WHERE id = ?
@@ -237,50 +335,6 @@ func UpdateUserAvatar(db *sqlx.DB, userID int, avatarURL string) error {
 	return nil
 }
 
-func GetAllUsers(db *sqlx.DB, page, pagesize int, search, role string) ([]UserListItem, error) {
-
-    offset := (page - 1) * pagesize
-
-    query := `
-        SELECT 
-            u.id, 
-            u.name, 
-            u.email, 
-            u.status, 
-            r.role_name AS role
-        FROM users u
-        JOIN user_roles ur ON ur.user_id = u.id
-        JOIN roles r ON r.id = ur.role_id
-        WHERE 1 = 1
-    `
-
-    args := []interface{}{}
-
-    if search != "" {
-        query += " AND u.name LIKE ? "
-        args = append(args, "%"+search+"%")
-    }
-
-    if role != "" {
-        query += " AND r.role_name = ? "
-        args = append(args, role)
-    }
-
-    query += `
-        ORDER BY u.id ASC
-        LIMIT ? OFFSET ?
-    `
-    args = append(args, pagesize, offset)
-
-    var users []UserListItem
-    err := db.Select(&users, query, args...)
-    if err != nil {
-        return nil, err
-    }
-
-    return users, nil
-}
-
 func UpdateUserProfile(db *sqlx.DB, userID int, address, phone, avatarPath string) error {
 	query := `UPDATE users SET address = ?, phone_number = ?, updated_at = NOW()`
 	args := []interface{}{address, phone}
@@ -297,129 +351,123 @@ func UpdateUserProfile(db *sqlx.DB, userID int, address, phone, avatarPath strin
 	return err
 }
 
-func GetContact(db *sqlx.DB, email string) (*AdminContact, error){
-
-	var contact AdminContact
-
-	query := `SELECT email, phone_number FROM users WHERE email = ?`
-	err := db.QueryRow(query, email).Scan(
-		&contact.Email,
-		&contact.Phone,
-	)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil, nil
-		}
-		return nil, err
-	}
-
-	return &contact, nil
-}
-
-func UpsertFullUser(db *sqlx.DB, u DCUser) error {
+func UpdateUser(db *sqlx.DB, form UserForm) error {
 	tx, err := db.Beginx()
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
-
-	finalRoleID := 0
-	if u.RoleObj != nil {
-		finalRoleID = u.RoleObj.ID
-	} else if u.RoleID != nil {
-		finalRoleID = *u.RoleID
-	}
-
-	finalAddress := u.Profile.Address
-	if finalAddress == "" {
-		finalAddress = u.Profile.AddressAlt
-	}
-
-	finalStatus := strings.ToLower(u.Status)
-
-	var dbDeletedAt *string
-	if u.DeletedAt != nil {
-		t, _ := time.Parse(time.RFC3339, *u.DeletedAt)
-		str := t.Format("2006-01-02 15:04:05")
-		dbDeletedAt = &str
-	}
-
-	qUser := `
-		INSERT INTO users (id, name, email, status, address, phone_number, created_at, updated_at, deleted_at)
-		VALUES (:id, :name, :email, :status, :address, :phone, NOW(), NOW(), :deleted_at)
-		ON DUPLICATE KEY UPDATE
-			name = VALUES(name),
-			email = VALUES(email),
-			status = VALUES(status),
-			address = VALUES(address),
-			phone_number = VALUES(phone_number),
-			updated_at = NOW(),
-			deleted_at = VALUES(deleted_at);
-	`
-	userParams := map[string]interface{}{
-		"id": u.ID, "name": u.Name, "email": u.Email, "status": finalStatus,
-		"address": finalAddress, "phone": u.Profile.Phone, "deleted_at": dbDeletedAt,
-	}
-	if _, err := tx.NamedExec(qUser, userParams); err != nil {
-		return fmt.Errorf("user error: %v", err)
-	}
-
-	if _, err := tx.Exec("DELETE FROM user_roles WHERE user_id = ?", u.ID); err != nil {
-		return fmt.Errorf("delete role error: %v", err)
-	}
-	if finalRoleID != 0 {
-		if _, err := tx.Exec("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)", u.ID, finalRoleID); err != nil {
-			return fmt.Errorf("insert role error: %v", err)
+	defer func() {
+		if err != nil {
+			tx.Rollback()
 		}
+	}()
+	_, err = tx.Exec(`UPDATE users SET name = ?, email = ?, status = ?, address = ?, phone_number = ?, updated_at = NOW() WHERE id = ?`,
+		form.Name, form.Email, form.Status, form.Address, form.Phone, form.ID)
+	if err != nil {
+		return err
 	}
 
-	
-	if u.Academic.NIM != nil {
-		qMhs := `INSERT INTO students (user_id, nim) VALUES (?, ?) ON DUPLICATE KEY UPDATE nim = VALUES(nim)`
-		if _, err := tx.Exec(qMhs, u.ID, *u.Academic.NIM); err != nil {
-			return fmt.Errorf("student error: %v", err)
-		}
+	_, err = tx.Exec(`DELETE FROM user_roles WHERE user_id=?`, form.ID)
+	_, err = tx.Exec(`DELETE FROM students WHERE user_id=?`, form.ID)
+	_, err = tx.Exec(`DELETE FROM lecturer_positions WHERE lecturer_id IN (SELECT id FROM lecturers WHERE user_id=?)`, form.ID)
+	_, err = tx.Exec(`DELETE FROM lecturers WHERE user_id=?`, form.ID)
+
+	if err != nil { return err }
+
+	if form.RoleID != 0 {
+		_, err = tx.Exec(`INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)`, form.ID, form.RoleID)
+		if err != nil { return err }
 	}
 
-	if u.Academic.NUPTK != nil || len(u.Academic.Positions) > 0 {
-		qDosen := `INSERT INTO lecturers (user_id, nip, nuptk) VALUES (?, ?, ?) 
-				   ON DUPLICATE KEY UPDATE nip = VALUES(nip), nuptk = VALUES(nuptk)`
-		if _, err := tx.Exec(qDosen, u.ID, u.Academic.NIP, u.Academic.NUPTK); err != nil {
-			return fmt.Errorf("lecturer error: %v", err)
-		}
-
-		var lecturerID int
-		if err := tx.Get(&lecturerID, "SELECT id FROM lecturers WHERE user_id = ?", u.ID); err != nil {
-			return fmt.Errorf("get lecturer id error: %v", err)
-		}
-
-		if _, err := tx.Exec("DELETE FROM lecturer_positions WHERE lecturer_id = ?", lecturerID); err != nil {
-			return fmt.Errorf("delete positions error: %v", err)
-		}
-
-		for _, pos := range u.Academic.Positions {
-			parsedStart, _ := time.Parse("02-01-2006", pos.StartDate)
-			startDateDB := parsedStart.Format("2006-01-02")
-
-			var endDateDB *string
-			if pos.EndDate != nil && *pos.EndDate != "" {
-				parsedEnd, _ := time.Parse("02-01-2006", *pos.EndDate)
-				str := parsedEnd.Format("2006-01-02")
-				endDateDB = &str
-			}
-
-			qPos := `
-                INSERT INTO lecturer_positions 
-                (lecturer_id, position_id, major_id, study_program_id, start_date, end_date, created_at, updated_at)
-			    VALUES (?, ?, ?, ?, ?, ?, NOW(), NOW())
-            `
-			
-			if _, err := tx.Exec(qPos, lecturerID, pos.IDJabatan, pos.IDJurusan, pos.IDProdi, startDateDB, endDateDB); err != nil {
-				return fmt.Errorf("insert position error: %v", err)
-			}
+	if form.RoleName == "mahasiswa" {
+		_, err = tx.Exec(`INSERT INTO students (user_id, nim) VALUES (?, ?)`, form.ID, form.NIM)
+		if err != nil { return err }
+	} else if form.RoleName == "dosen" {
+		res, err := tx.Exec(`INSERT INTO lecturers (user_id, nip, nuptk) VALUES (?, ?, ?)`, form.ID, form.NIP, form.NUPTK)
+		if err != nil { return err }
+		
+		lecturerID, _ := res.LastInsertId()
+		
+		for _, pos := range form.Positions {
+			_, err = tx.Exec(`INSERT INTO lecturer_positions (lecturer_id, position_id, major_id, study_program_id, start_date, end_date) 
+			VALUES (?, ?, ?, ?, ?, ?)`,
+				lecturerID, pos.PositionID, pos.MajorID, pos.StudyProgramID, pos.StartDate, pos.EndDate)
+			if err != nil { return err }
 		}
 	}
 
 	return tx.Commit()
 }
 
+// =================
+// DELETE FUNCTIONS
+// =================
+func DeleteUser(db *sqlx.DB, userID int) error {
+	tx, err := db.Beginx()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if err != nil {
+			tx.Rollback()
+		}
+	}()
+	_, err = tx.Exec(`UPDATE users SET deleted_at = NOW() WHERE id = ?`, userID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM lecturers WHERE user_id = ?`, userID)
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(`DELETE FROM students WHERE user_id = ?`, userID)
+	if err != nil {
+		return err
+	}
+	err = tx.Commit()
+	return err
+}
+
+// ==========================================
+// HELPER: PARSE JSON POSITIONS
+// ==========================================
+func ParseLecturerPositions(jsonStr string) ([]LecturerPosition, error) {
+	if jsonStr == "" || jsonStr == "[]" {
+		return nil, nil
+	}
+
+	var raw []PositionFormJSON
+	if err := json.Unmarshal([]byte(jsonStr), &raw); err != nil {
+		return nil, err
+	}
+
+	var result []LecturerPosition
+	for _, p := range raw {
+        if p.PositionID == 0 { continue }
+
+		pos := LecturerPosition{
+			PositionID: p.PositionID,
+			StartDate:  GetPtr(p.StartDate),
+			EndDate:    GetPtr(p.EndDate), 
+		}
+
+		if p.Scope == "major" && p.MajorID > 0 {
+			pos.MajorID = sql.NullInt64{Int64: int64(p.MajorID), Valid: true}
+		} else if p.Scope == "prodi" && p.ProdiID > 0 {
+			pos.StudyProgramID = sql.NullInt64{Int64: int64(p.ProdiID), Valid: true}
+		}
+
+		result = append(result, pos)
+	}
+	return result, nil
+}
+
+// Helper GetPtr
+func GetPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
+}

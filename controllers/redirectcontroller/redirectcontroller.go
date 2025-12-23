@@ -2,12 +2,13 @@ package redirectcontroller
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
-	"sso-portal-v3/config"
-	"sso-portal-v3/models"
-	"sso-portal-v3/views"
+	"sso-portal-v5/config"
+	"sso-portal-v5/models"
+	"sso-portal-v5/views"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -40,13 +41,13 @@ func (rc *RedirectController) RedirectToApp(w http.ResponseWriter, r *http.Reque
 
 	appSlug := r.URL.Query().Get("app")
 	if appSlug == "" {
-		http.Error(w, "Aplikasi tujuan tidak spesifik", http.StatusBadRequest)
+		rc.RenderError(w, r, http.StatusBadRequest, "Slug tidak Valid")
 		return
 	}
 
 	app, err := models.FindApplicationBySlug(rc.env.DB, appSlug)
 	if err != nil {
-		http.Error(w, "Aplikasi tidak ditemukan atau tidak terdaftar", http.StatusNotFound)
+		rc.RenderError(w, r, http.StatusNotFound, "Aplikasi Tidak Ditemukan.")
 		return
 	}
 
@@ -78,9 +79,24 @@ func (rc *RedirectController) RedirectToApp(w http.ResponseWriter, r *http.Reque
 
 	tokenString, err := token.SignedString(config.PrivateKey)
 	if err != nil {
-		http.Error(w, "Gagal membuat token", http.StatusInternalServerError)
+		rc.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 	finalURL := fmt.Sprintf("%s?token=%s", app.TargetURL, url.QueryEscape(tokenString))
+
+	go models.ClearNotification(rc.env.DB, user.ID, app.ID)
+
 	http.Redirect(w, r, finalURL, http.StatusTemporaryRedirect)
+}
+
+func (ac *RedirectController) RenderError(w http.ResponseWriter, r *http.Request, code int, message string) {
+    w.WriteHeader(code)
+    
+    data := map[string]interface{}{
+        "Code":    code,
+        "Message": message,
+    }
+    
+    ac.views.RenderPage(w, r, "error", data)
 }

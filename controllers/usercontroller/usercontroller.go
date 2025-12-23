@@ -9,10 +9,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sso-portal-v3/config"
-	"sso-portal-v3/models"
-	"sso-portal-v3/services"
-	"sso-portal-v3/views"
+	"sso-portal-v5/config"
+	"sso-portal-v5/models"
+	"sso-portal-v5/services"
+	"sso-portal-v5/views"
 	"strconv"
 	"strings"
 	"time"
@@ -31,6 +31,16 @@ func NewUserController(env *config.Env, v *views.Views) *UserController {
 
 // ShowProfileForm menampilkan halaman edit profil pengguna
 func (uc *UserController) ShowProfileForm(w http.ResponseWriter, r *http.Request) {
+
+	 session, _ := uc.env.Store.Get(r, uc.env.SessionName)
+    
+    flashes := session.Flashes()
+    session.Save(r, w) 
+
+    var flashMsg string
+    if len(flashes) > 0 {
+        flashMsg = flashes[0].(string)
+    }
 
 	user := r.Context().Value("UserLogin").(*models.FullUser)
 
@@ -59,6 +69,7 @@ func (uc *UserController) ShowProfileForm(w http.ResponseWriter, r *http.Request
 
 	data := map[string]interface{}{
 		"Profile": profile,
+		"Flash": flashMsg,
 	}
 
 	uc.views.RenderPage(w, r, "edit-profile", data)
@@ -123,7 +134,6 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 				defer dst.Close()
 				if _, err := io.Copy(dst, file); err == nil {
 					avatarPath = "/uploads/avatars/" + fileName
-					log.Printf("INFO: User %d update avatar via FILE UPLOAD", userID)
 				}
 			}
 		}
@@ -136,16 +146,14 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
 			err = os.Remove(oldFileObj)
 			if err != nil {
 				log.Println("WARNING: Gagal menghapus avatar lama fisik:", err)
-			} else {
-				log.Println("SUCCESS: Avatar lama dihapus:", oldFileObj)
 			}
 		}
 	}
 
 	err := models.UpdateUserProfile(uc.env.DB, userID, address, phone, avatarPath)
 	if err != nil {
-		log.Printf("ERROR: Gagal update profil user %d: %v", userID, err)
-		http.Error(w, "Gagal mengupdate profil", http.StatusInternalServerError)
+		uc.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
@@ -159,6 +167,11 @@ func (uc *UserController) HandleProfileUpdate(w http.ResponseWriter, r *http.Req
     }
 
     services.SendUserUpdateWebhook(uc.env, user, changes)
+
+	session, _ := uc.env.Store.Get(r, uc.env.SessionName)
+    session.AddFlash("Data berhasil diperbarui!")
+    session.Save(r, w)
+
 	http.Redirect(w, r, "/profile/edit", http.StatusFound)
 }
 
@@ -226,4 +239,15 @@ func (uc *UserController) ServeAvatar(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "max-age=60, must-revalidate")
 
 	http.ServeFile(w, r, filePath)
+}
+
+func (ac *UserController) RenderError(w http.ResponseWriter, r *http.Request, code int, message string) {
+    w.WriteHeader(code)
+    
+    data := map[string]interface{}{
+        "Code":    code,
+        "Message": message,
+    }
+    
+    ac.views.RenderPage(w, r, "error", data)
 }

@@ -2,27 +2,11 @@ package models
 
 import "github.com/jmoiron/sqlx"
 
-// ==============================
-// LOCAL STRUCT 
-// ==============================
 type Major struct {
 	ID         int    `db:"id"`
 	Name string `db:"major_name"`
 }
 
-// ==============================
-// DATA CENTER STRUCT 
-// ==============================
-type DCMajorResponse struct {
-	Code   int         `json:"code"`
-	Status string      `json:"status"`
-	Data   []DCMajor `json:"data"`
-}
-type DCMajor struct {
-	ID   int    `json:"id_jurusan"`
-	Name string `json:"nama_jurusan"`
-	DeletedAt *string `json:"deleted_at"`
-}
 
 func GetAllMajors(db *sqlx.DB) ([]Major, error) {
 	var data []Major
@@ -31,20 +15,27 @@ func GetAllMajors(db *sqlx.DB) ([]Major, error) {
 	return data, err
 }
 
-func UpsertMajor(db *sqlx.DB, data DCMajor) error {
-	query := `
-		INSERT INTO majors (id, major_name, created_at, updated_at, deleted_at)
-		VALUES (:id, :name, NOW(), NOW(), :deleted_at)
-		ON DUPLICATE KEY UPDATE
-			major_name = VALUES(major_name),
-			updated_at = NOW(),
-			deleted_at = VALUES(deleted_at);
-	`
-	params := map[string]interface{}{
-		"id":   data.ID,
-		"name": data.Name,
-		"deleted_at": data.DeletedAt,
-	}
-	_, err := db.NamedExec(query, params)
+func FindMajorByID(db *sqlx.DB, id int) (*Major, error) {
+	var m Major
+	query := "SELECT id, major_name FROM majors WHERE id = ? AND deleted_at IS NULL"
+	err := db.Get(&m, query, id)
+	return &m, err
+}
+
+func CreateMajor(db *sqlx.DB, name string) error {
+	query := `INSERT INTO majors (major_name, created_at, updated_at) VALUES (?, NOW(), NOW())`
+	_, err := db.Exec(query, name)
+	return err
+}
+
+func UpdateMajor(db *sqlx.DB, id int, name string) error {
+	query := `UPDATE majors SET major_name = ?, updated_at = NOW() WHERE id = ?`
+	_, err := db.Exec(query, name, id)
+	return err
+}
+
+func DeleteMajor(db *sqlx.DB, id int) error {
+	query := `UPDATE majors SET deleted_at = NOW() WHERE id = ?`
+	_, err := db.Exec(query, id)
 	return err
 }

@@ -8,17 +8,19 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"sso-portal-v3/config"
-	"sso-portal-v3/models"
+	"sso-portal-v5/config"
+	"sso-portal-v5/models"
+	"sso-portal-v5/views"
 	"strings"
 )
 
 type AuthController struct {
 	env *config.Env
+	views *views.Views
 }
 
-func NewAuthController(env *config.Env) *AuthController {
-	return &AuthController{env: env}
+func NewAuthController(env *config.Env, v *views.Views) *AuthController {
+	return &AuthController{env: env, views: v}
 }
 
 // ShowLoginPage menampilkan halaman login.
@@ -36,11 +38,7 @@ func (ac *AuthController) ShowLoginPage(w http.ResponseWriter, r *http.Request) 
 		"FlashMessages": flashes,
 	}
 
-	err := ac.env.Templates["login"].ExecuteTemplate(w, "login.html", data)
-	if err != nil {
-		log.Printf("Gagal render template login: %v", err)
-		http.Error(w, "Terjadi kesalahan internal", http.StatusInternalServerError)
-	}
+	ac.env.Templates["login"].ExecuteTemplate(w, "login.html", data)
 }
 
 // LoginWithGoogle menginisiasi proses OAuth2 dengan Google.
@@ -48,8 +46,8 @@ func (ac *AuthController) LoginWithGoogle(w http.ResponseWriter, r *http.Request
 	b := make([]byte, 32)
 	_, err := rand.Read(b)
 	if err != nil {
-		log.Printf("ERROR: Gagal membuat state token acak: %v", err)
-		http.Error(w, "Gagal membuat state token", http.StatusBadRequest)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 	state := base64.URLEncoding.EncodeToString(b)
@@ -58,7 +56,8 @@ func (ac *AuthController) LoginWithGoogle(w http.ResponseWriter, r *http.Request
 	session.Values["state"] = state
 	err = session.Save(r, w)
 	if err != nil {
-		http.Error(w, "Gagal menyimpan session", http.StatusInternalServerError)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
@@ -85,7 +84,7 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 	token, err := ac.env.GoogleOAuthConfig.Exchange(context.Background(), code)
 
 	if err != nil {
-		log.Printf("ERROR: Gagal menukar kode dengan token: %v", err)
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		http.Error(w, "Gagal menukar kode dengan token", http.StatusInternalServerError)
 		return
 	}
@@ -93,7 +92,7 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 	client := ac.env.GoogleOAuthConfig.Client(context.Background(), token)
 	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
 	if err != nil || resp.StatusCode != http.StatusOK {
-		log.Printf("ERROR: Gagal mendapatkan user info dari Google: %v", err)
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		http.Error(w, "Gagal mendapatkan informasi user dari Google", http.StatusInternalServerError)
 		return
 	}
@@ -109,7 +108,7 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 
 	err = json.NewDecoder(resp.Body).Decode(&userProfile)
 	if err != nil {
-		log.Printf("ERROR: Gagal decode user info JSON: %v", err)
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		http.Error(w, "Gagal memproses informasi user dari Google", http.StatusInternalServerError)
 		return
 	}
@@ -118,7 +117,6 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 	if !userProfile.VerifiedEmail || (!strings.HasSuffix(userProfile.Email, "@pnc.ac.id") && userProfile.Email != adminEmail) {
 		session.AddFlash("Hanya email dengan domain @pnc.ac.id yang diizinkan.")
 		session.Save(r, w)
-		log.Println("Akses ditolak untuk email:", userProfile.Email)
 		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
@@ -126,7 +124,7 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 	user, err := models.FindUserByEmail(ac.env.DB, userProfile.Email)
 	if err != nil {
 		http.Error(w, "Gagal mengambil detail user", http.StatusInternalServerError)
-		log.Println("ERROR : ", err)
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
@@ -181,17 +179,26 @@ func (ac *AuthController) GoogleCallback(w http.ResponseWriter, r *http.Request)
 func (ac *AuthController) Logout(w http.ResponseWriter, r *http.Request) {
 	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
 
-	// Cara terbaik untuk menghapus session adalah dengan membuatnya kedaluwarsa.
-	// Mengatur MaxAge ke -1 akan memberitahu browser untuk segera menghapus cookie.
 	session.Options.MaxAge = -1
 
-	// Simpan perubahan pada session
 	err := session.Save(r, w)
 	if err != nil {
 		http.Error(w, "Gagal untuk logout", http.StatusInternalServerError)
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
 	// Arahkan pengguna kembali ke halaman login
 	http.Redirect(w, r, "/", http.StatusFound)
+}
+
+func (ac *AuthController) RenderError(w http.ResponseWriter, r *http.Request, code int, message string) {
+    w.WriteHeader(code)
+    
+    data := map[string]interface{}{
+        "Code":    code,
+        "Message": message,
+    }
+    
+    ac.views.RenderPage(w, r, "error", data)
 }

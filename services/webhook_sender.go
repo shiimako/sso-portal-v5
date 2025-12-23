@@ -8,8 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"sso-portal-v3/config"
-	"sso-portal-v3/models"
+	"sso-portal-v5/config"
+	"sso-portal-v5/models"
 	"time"
 )
 
@@ -37,22 +37,22 @@ func SendUserUpdateWebhook(env *config.Env, user *models.FullUser, updatedData m
 		client := &http.Client{Timeout: 5 * time.Second}
 		req, err := http.NewRequest("POST", targetURL, bytes.NewBuffer(jsonBody))
 		if err != nil {
-			fmt.Printf("❌ Gagal membuat request webhook: %v\n", err)
+			fmt.Printf("Gagal membuat request webhook: %v\n", err)
 			return
 		}
 
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("X-Signature", signature)
 		req.Header.Set("X-API-KEY", env.DataCenterKey)
-		req.Header.Set("X-Client-ID", "sso-portal-v3")
+		req.Header.Set("X-Client-ID", "sso-portal-v5")
 
 		resp, err := client.Do(req)
 		if err != nil {
-			fmt.Printf("❌ Gagal mengirim webhook ke Data Center: %v\n", err)
+			fmt.Printf("Gagal mengirim webhook ke Data Center: %v\n", err)
 			return
 		}
 		defer resp.Body.Close()
 
-		fmt.Printf("🚀 Webhook Profile Update dikirim! Status: %d\n", resp.StatusCode)
+		fmt.Printf("Webhook Profile Update dikirim! Status: %d\n", resp.StatusCode)
 	}()
 }

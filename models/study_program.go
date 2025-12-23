@@ -9,19 +9,6 @@ type StudyProgram struct {
 	MajorID   int    `db:"major_id"`
 }
 
-type DCStudyProgram struct {
-	ID        int     `json:"id_prodi"`
-	Name      string  `json:"nama_prodi"`
-	MajorID   int     `json:"id_jurusan"`
-	DeletedAt *string `json:"deleted_at"`
-}
-
-type DCStudyProgramResponse struct {
-	Code   int         `json:"code"`
-	Status string      `json:"status"`
-	Data   []DCStudyProgram `json:"data"`
-}
-
 func GetAllStudyPrograms(db *sqlx.DB) ([]StudyProgram, error) {
 	var data []StudyProgram
 	query := `
@@ -34,24 +21,32 @@ func GetAllStudyPrograms(db *sqlx.DB) ([]StudyProgram, error) {
 	return data, err
 }
 
-func UpsertStudyPrograms(db *sqlx.DB, data DCStudyProgram) error {
+func FindStudyProgramByID(db *sqlx.DB, id int) (*StudyProgram, error) {
+	var sp StudyProgram
 	query := `
-		INSERT INTO study_programs 
-			(id, study_program_name, major_id, created_at, updated_at, deleted_at)
-		VALUES 
-			(:id, :name, :major_id, NOW(), NOW(), :deleted_at)
-		ON DUPLICATE KEY UPDATE
-			study_program_name = VALUES(study_program_name),
-			major_id = VALUES(major_id),
-			updated_at = NOW(),
-			deleted_at = VALUES(deleted_at);
+		SELECT sp.id, sp.study_program_name, sp.major_id, m.major_name 
+		FROM study_programs sp
+		LEFT JOIN majors m ON sp.major_id = m.id
+		WHERE sp.id = ? AND sp.deleted_at IS NULL
 	`
-	params := map[string]interface{}{
-		"id":         data.ID,
-		"name":       data.Name,
-		"major_id":   data.MajorID, 
-		"deleted_at": data.DeletedAt,
-	}
-	_, err := db.NamedExec(query, params)
+	err := db.Get(&sp, query, id)
+	return &sp, err
+}
+
+func CreateStudyProgram(db *sqlx.DB, name string, majorID int) error {
+	query := `INSERT INTO study_programs (study_program_name, major_id, created_at, updated_at) VALUES (?, ?, NOW(), NOW())`
+	_, err := db.Exec(query, name, majorID)
+	return err
+}
+
+func UpdateStudyProgram(db *sqlx.DB, id int, name string, majorID int) error {
+	query := `UPDATE study_programs SET study_program_name = ?, major_id = ?, updated_at = NOW() WHERE id = ?`
+	_, err := db.Exec(query, name, majorID, id)
+	return err
+}
+
+func DeleteStudyProgram(db *sqlx.DB, id int) error {
+	query := `UPDATE study_programs SET deleted_at = NOW() WHERE id = ?`
+	_, err := db.Exec(query, id)
 	return err
 }

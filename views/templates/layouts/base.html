@@ -17,6 +17,33 @@
       [x-cloak] {
         display: none !important;
       }
+
+      .category-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  .category-scrollbar::-webkit-scrollbar {
+    height: 8px;
+  }
+
+  .category-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .category-scrollbar::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 9999px;
+  }
+
+  .category-scrollbar::-webkit-scrollbar-thumb {
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .category-scrollbar:hover::-webkit-scrollbar-thumb {
+    opacity: 1;
+  }
     </style>
   </head>
 

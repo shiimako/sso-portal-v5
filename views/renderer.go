@@ -3,12 +3,13 @@
 package views
 
 import (
+	"encoding/json"
 	"html/template"
 	"log"
 	"net/http"
 	"path/filepath"
-	"sso-portal-v3/config"
-	"sso-portal-v3/models"
+	"sso-portal-v5/config"
+	"sso-portal-v5/models"
 	"strings"
 )
 
@@ -35,14 +36,22 @@ func InitTemplates() (map[string]*template.Template, error) {
 		"contains": func(s, substr string) bool {
 			return strings.Contains(s, substr)
 		},
-		"js": func(s string) template.JS { return template.JS(s) }, // Helper untuk JS di dashboard
+		"js": func(s string) template.JS { return template.JS(s) },
+		"json": func(v interface{}) template.JS {
+			a, _ := json.Marshal(v)
+			return template.JS(a)
+		},
+		"add": func(a, b int) int {
+			return a + b
+		},
+		"sub": func(a, b int) int {
+			return a - b
+		},
 	}
 
-	// 1. Parse Layouts & Partials dulu (Base, Header, dll) ke dalam template 'root'
-	// Pastikan base.html ada di folder layouts
+
 	rootTmpl := template.New("root").Funcs(funcMap)
 
-	// Parse glob layouts & partials
 	patterns := []string{
 		"views/templates/layouts/*.html",
 		"views/templates/partials/*.html",
@@ -54,12 +63,11 @@ func InitTemplates() (map[string]*template.Template, error) {
 		}
 	}
 
-	// 2. Loop setiap file Halaman secara manual
-	// Ini kuncinya: Setiap halaman punya instance template sendiri
+	// Muat semua halaman dari views/pages/
 	pagePatterns := []string{
-		"views/pages/*.html",     // Untuk file langsung di pages/ (jika ada)
-		"views/pages/*/*.html",   // Untuk pages/auth/login.html, pages/dashboard/dashboard.html
-		"views/pages/*/*/*.html", // Untuk pages/admin/apps/admin-app-list.html
+		"views/pages/*.html",     // Untuk file langsung di pages/
+		"views/pages/*/*.html",   // Untuk pages/{folder}/{page}.html
+		"views/pages/*/*/*.html", // Untuk pages/{folder}/{subfolder}/{page}.html
 	}
 
 	var pages []string
@@ -71,33 +79,27 @@ func InitTemplates() (map[string]*template.Template, error) {
 		pages = append(pages, matches...)
 	}
 
-	// Cek jika tidak ada halaman ditemukan sama sekali (opsional, buat debugging)
 	if len(pages) == 0 {
 		log.Println("WARNING: Tidak ada file template halaman yang ditemukan!")
 	}
 
-	// Jika ada subfolder (views/pages/*/*.html), tambahkan logic glob tambahan disini
 
 	for _, pageFile := range pages {
 		fileName := filepath.Base(pageFile)
-		name := strings.TrimSuffix(fileName, ".html") // misal: "dashboard"
+		name := strings.TrimSuffix(fileName, ".html")
 
-		// Clone dari root (mendapatkan base, header, dll)
 		tmplClone, err := rootTmpl.Clone()
 		if err != nil {
 			return nil, err
 		}
 
-		// Parse file halaman spesifik ke dalam clone tersebut
 		_, err = tmplClone.ParseFiles(pageFile)
 		if err != nil {
 			return nil, err
 		}
 
-		// Simpan ke map dengan nama file sebagai key (misal: "dashboard")
-		// Catatan: Di controller nanti panggil berdasarkan key ini, bukan define name.
+		// Simpan template dengan nama halaman sebagai key
 		templates[name] = tmplClone
-		// Atau jika file mendefinisikan {{define "dashboard"}}, Anda tetap bisa pakai key string bebas.
 	}
 	return templates, nil
 }

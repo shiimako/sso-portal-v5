@@ -1,0 +1,217 @@
+{{define "content"}}
+<div x-data="catList()" class="space-y-6">
+  {{if .Data.Flash}}
+  <div
+    x-data="{ show: true }"
+    x-init="setTimeout(() => show = false, 4000)"
+    x-show="show"
+    x-transition:enter="transition ease-out duration-300"
+    x-transition:enter-start="opacity-0 translate-y-2"
+    x-transition:enter-end="opacity-100 translate-y-0"
+    x-transition:leave="transition ease-in duration-300"
+    x-transition:leave-start="opacity-100 translate-y-0"
+    x-transition:leave-end="opacity-0 translate-y-2"
+    class="fixed top-24 right-6 z-50 flex items-center gap-3 bg-emerald-500 text-white px-6 py-4 rounded-xl shadow-2xl shadow-emerald-500/20 border border-emerald-400/50"
+  >
+    <div class="bg-white/20 p-2 rounded-full">
+      <i data-lucide="check" class="w-5 h-5 text-white"></i>
+    </div>
+    <div>
+      <h4 class="font-bold text-sm">Informasi</h4>
+      <p class="text-xs text-emerald-50 opacity-90">{{.Data.Flash}}</p>
+    </div>
+    <button
+      @click="show = false"
+      class="ml-4 text-white/70 hover:text-white transition"
+    >
+      <i data-lucide="x" class="w-4 h-4"></i>
+    </button>
+  </div>
+  {{end}}
+
+  <div>
+    <a
+      href="/admin/dashboard"
+      class="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 transition text-sm font-medium"
+    >
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      Kembali ke Dashboard Admin
+    </a>
+  </div>
+
+  <div
+    class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-gray-200 pb-4"
+  >
+    <div>
+      <h3 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+        <div class="p-2 bg-sky-50 rounded-lg">
+          <i data-lucide="tags" class="w-5 h-5 text-sky-600"></i>
+        </div>
+        Manajemen Kategori
+      </h3>
+      <p class="text-gray-500 text-sm mt-1 ml-1">
+        Atur kategori untuk pengelompokan aplikasi.
+      </p>
+    </div>
+
+    <a
+      href="/admin/category/new"
+      class="bg-sky-600 hover:bg-sky-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-sm hover:shadow flex items-center gap-2 transition"
+    >
+      <i data-lucide="plus-circle" class="w-4 h-4"></i>
+      Kategori Baru
+    </a>
+  </div>
+
+  <div
+    class="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200"
+  >
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 text-gray-700 border-b">
+        <tr>
+          <th
+            class="px-6 py-3 text-left font-semibold uppercase text-xs tracking-wider w-20"
+          >
+            ID
+          </th>
+          <th
+            class="px-6 py-3 text-left font-semibold uppercase text-xs tracking-wider"
+          >
+            Nama Kategori
+          </th>
+          <th
+            class="px-6 py-3 text-center font-semibold uppercase text-xs tracking-wider w-32"
+          >
+            Urutan
+          </th>
+          <th
+            class="px-6 py-3 text-right font-semibold uppercase text-xs tracking-wider w-40"
+          >
+            Aksi
+          </th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-100">
+        {{range .Data.Cats}}
+        <tr class="hover:bg-gray-50 transition group">
+          <td class="px-6 py-4 text-gray-500 font-mono text-xs">#{{.ID}}</td>
+          <td class="px-6 py-4 font-medium text-gray-900">{{.Name}}</td>
+          <td class="px-6 py-4 text-center">
+            <span
+              class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-mono border border-slate-200"
+            >
+              {{.Sort}}
+            </span>
+          </td>
+          <td class="px-6 py-4 text-right">
+            <div class="flex justify-end gap-2">
+              <a
+                href="/admin/category/edit/{{.ID}}"
+                class="text-gray-500 hover:text-yellow-600 p-1.5 border rounded-lg hover:bg-yellow-50 transition"
+                title="Edit"
+              >
+                <i data-lucide="pencil" class="w-4 h-4"></i>
+              </a>
+              <button
+                @click="confirmDelete('{{.ID}}', '{{.Name}}')"
+                class="text-gray-500 hover:text-red-600 p-1.5 border rounded-lg hover:bg-red-50 transition"
+                title="Hapus"
+              >
+                <i data-lucide="trash-2" class="w-4 h-4"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+        {{else}}
+        <tr>
+          <td colspan="4" class="px-6 py-12 text-center text-gray-400">
+            Belum ada kategori data.
+          </td>
+        </tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="flex justify-between items-center text-sm text-gray-600 pt-2">
+    <div>Halaman <span class="font-bold">{{.Data.Page}}</span></div>
+    <div class="flex gap-2">
+      {{if gt .Data.Page 1}}
+      <a
+        href="?page={{sub .Data.Page 1}}&limit={{.Data.Limit}}"
+        class="px-3 py-1 border rounded hover:bg-gray-100 transition"
+        >Sebelumnya</a
+      >
+      {{end}} {{if eq (len .Data.Cats) .Data.Limit}}
+      <a
+        href="?page={{add .Data.Page 1}}&limit={{.Data.Limit}}"
+        class="px-3 py-1 border rounded hover:bg-gray-100 transition"
+        >Selanjutnya</a
+      >
+      {{end}}
+    </div>
+  </div>
+
+  <div
+    x-show="modalDelete"
+    x-cloak
+    class="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+    x-transition:enter="transition ease-out duration-200"
+    x-transition:enter-start="opacity-0 scale-95"
+    x-transition:enter-end="opacity-100 scale-100"
+  >
+    <div
+      class="bg-white w-full max-w-sm rounded-xl shadow-2xl p-6 border border-gray-100"
+      @click.outside="modalDelete=false"
+    >
+      <div class="text-center">
+        <div
+          class="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-red-100 mb-4"
+        >
+          <i data-lucide="alert-triangle" class="w-6 h-6 text-red-600"></i>
+        </div>
+        <h3 class="text-lg font-bold text-gray-900">Hapus Kategori?</h3>
+        <p class="text-gray-500 text-sm mt-2 leading-relaxed">
+          Anda akan menghapus kategori
+          <b x-text="deleteName" class="text-gray-800"></b>. <br /><span
+            class="text-xs text-red-500 font-medium"
+            >Pastikan tidak ada aplikasi yang menggunakan kategori ini.</span
+          >
+        </p>
+      </div>
+
+      <div class="mt-6 flex justify-center gap-3">
+        <button
+          @click="modalDelete=false"
+          class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium transition text-sm"
+        >
+          Batal
+        </button>
+        <form :action="deleteUrl" method="POST">
+          <button
+            type="submit"
+            class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-sm transition flex items-center gap-2 text-sm"
+          >
+            Ya, Hapus
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function catList() {
+    return {
+      modalDelete: false,
+      deleteUrl: "",
+      deleteName: "",
+      confirmDelete(id, name) {
+        this.deleteUrl = `/admin/category/delete/${id}`;
+        this.deleteName = name;
+        this.modalDelete = true;
+      },
+    };
+  }
+</script>
+{{end}}

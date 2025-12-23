@@ -1,97 +1,90 @@
 package admincontroller
 
 import (
-	"encoding/json"
-	"fmt"
-	"log"
 	"net/http"
-	"sso-portal-v3/models"
-	"sso-portal-v3/services"
-	"strings"
-)
+	"sso-portal-v5/models"
+	"strconv"
 
+	"github.com/gorilla/mux"
+)
 
 func (ac *AdminController) ListMajors(w http.ResponseWriter, r *http.Request) {
 	data, err := models.GetAllMajors(ac.env.DB)
 	if err != nil {
-		http.Error(w, "Gagal mengambil data jurusan", 500)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Gagal mengambil data jurusan.")
 		return
 	}
 	ac.views.RenderPage(w, r, "admin-majors-list", map[string]interface{}{"Data": data})
 }
 
-func (ac *AdminController) StreamMajorsSync(w http.ResponseWriter, r *http.Request) {
-	// Setup Header SSE
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+func (ac *AdminController) NewMajorForm(w http.ResponseWriter, r *http.Request) {
+	ac.views.RenderPage(w, r, "admin-majors-form", map[string]interface{}{
+		"IsEdit": false,
+	})
+}
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", 500)
+func (ac *AdminController) CreateMajor(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Gagal parsing form", http.StatusBadRequest)
 		return
 	}
 
-	sendJSON := func(data map[string]interface{}) {
-		jsonMsg, _ := json.Marshal(data)
-		fmt.Fprintf(w, "data: %s\n\n", jsonMsg)
-		flusher.Flush()
+	name := r.FormValue("name")
+	if name == "" {
+		http.Error(w, "Nama jurusan tidak boleh kosong", http.StatusBadRequest)
+		return
 	}
 
-	models.CreateLog(ac.env.DB, "MANUAL", "JURUSAN", "RUNNING", "Memulai sinkronisasi Jurusan.")
-
-	serviceReporter := func(progress int, msg string) {
-		sendJSON(map[string]interface{}{
-			"progress": progress,
-			"log":      msg,
-			"status":   "running",
-		})
+	if err := models.CreateMajor(ac.env.DB, name); err != nil {
+		http.Error(w, "Gagal menyimpan jurusan: "+err.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	err := services.SyncMajors(ac.env, serviceReporter, "")
-
-	if err != nil {
-		models.CreateLog(ac.env.DB, "MANUAL", "JURUSAN", "ERROR", err.Error())
-		sendJSON(map[string]interface{}{
-			"status":  "error",
-			"message": err.Error(),
-			"log":     "❌ Gagal Sync.",
-		})
-	} else {
-		models.CreateLog(ac.env.DB, "MANUAL", "JURUSAN", "SUCCESS", "Sinkronisasi Jurusan Berhasil.")
-		sendJSON(map[string]interface{}{
-			"status": "done",
-			"log":    "✅ Selesai.",
-		})
-	}
+	http.Redirect(w, r, "/admin/jurusan", http.StatusFound)
 }
 
-func (ac *AdminController) RunMajorsCron() {
-	
-	log.Println("⏰ [CRON] Memulai Sync Jurusan...")
+func (ac *AdminController) EditMajorForm(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"])
 
-	// 1. Catat Log DB: START
-	models.CreateLog(ac.env.DB, "CRON", "JURUSAN", "RUNNING", "Cron job jurusan berjalan otomatis.")
-
-	lastTime, _ := models.GetLastSuccessTime(ac.env.DB, "JURUSAN")
-
-	// 2. Buat Reporter "Bisu" (Cuma print ke console server, bukan HTTP)
-	cronReporter := func(progress int, msg string) {
-		// Kita bisa filter, misal cuma lapor kalau 100% atau Error
-		if progress == 100 || strings.Contains(msg, "❌") {
-			log.Printf("[CRON JURUSAN] %s", msg)
-		}
-	}
-
-	// 3. Eksekusi Service
-	err := services.SyncMajors(ac.env, cronReporter, lastTime)
-
-	// 4. Catat Log DB: FINISH
+	major, err := models.FindMajorByID(ac.env.DB, id)
 	if err != nil {
-		log.Printf("❌ [CRON] Jurusan Gagal: %v", err)
-		models.CreateLog(ac.env.DB, "CRON", "JURUSAN", "ERROR", err.Error())
-	} else {
-		log.Println("✅ [CRON] Jurusan Selesai.")
-		models.CreateLog(ac.env.DB, "CRON", "JURUSAN", "SUCCESS", "Cron job jurusan berhasil selesai.")
+		http.Error(w, "Jurusan tidak ditemukan", http.StatusNotFound)
+		return
 	}
+
+	ac.views.RenderPage(w, r, "admin-majors-form", map[string]interface{}{
+		"Major":  major,
+		"IsEdit": true,
+	})
+}
+
+func (ac *AdminController) UpdateMajor(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"])
+
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "Gagal parsing form", http.StatusBadRequest)
+		return
+	}
+
+	name := r.FormValue("name")
+	if err := models.UpdateMajor(ac.env.DB, id, name); err != nil {
+		http.Error(w, "Gagal update jurusan: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/jurusan", http.StatusFound)
+}
+
+func (ac *AdminController) DeleteMajor(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, _ := strconv.Atoi(vars["id"])
+
+	if err := models.DeleteMajor(ac.env.DB, id); err != nil {
+		http.Error(w, "Gagal menghapus jurusan", http.StatusInternalServerError)
+		return
+	}
+
+	http.Redirect(w, r, "/admin/jurusan", http.StatusFound)
 }

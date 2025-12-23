@@ -21,7 +21,7 @@ func InitSessionStore() *sessions.CookieStore {
 		Path:     "/",
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
-		// Secure: true, // <-- Aktifkan ini saat sudah menggunakan HTTPS (production)
+		// Secure: true, // Aktifkan ini saat sudah menggunakan HTTPS (production)
 	}
 
 	return store

@@ -3,13 +3,14 @@
 package admincontroller
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
-	"sso-portal-v3/models"
+	"sso-portal-v5/models"
 	"strconv"
 	"strings"
 
@@ -19,6 +20,15 @@ import (
 
 // ListApplications menampilkan halaman daftar semua aplikasi.
 func (ac *AdminController) ListApplications(w http.ResponseWriter, r *http.Request) {
+	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
+
+	flashes := session.Flashes()
+	session.Save(r, w)
+
+	var flashMsg string
+	if len(flashes) > 0 {
+		flashMsg = flashes[0].(string)
+	}
 
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
@@ -43,7 +53,8 @@ func (ac *AdminController) ListApplications(w http.ResponseWriter, r *http.Reque
 
 	apps, err := models.GetAllApplications(ac.env.DB, page, limit, search)
 	if err != nil {
-		http.Error(w, "Gagal mengambil data aplikasi", http.StatusInternalServerError)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
@@ -52,6 +63,7 @@ func (ac *AdminController) ListApplications(w http.ResponseWriter, r *http.Reque
 		"Page":   page,
 		"Limit":  limit,
 		"Search": search,
+		"Flash":  flashMsg,
 	}
 
 	ac.views.RenderPage(w, r, "admin-app-list", pageData)
@@ -63,7 +75,7 @@ func (ac *AdminController) DetailApplication(w http.ResponseWriter, r *http.Requ
 
 	app, roleIDs, PosIDs, err := models.FindApplicationByID(ac.env.DB, id)
 	if err != nil {
-		http.Error(w, "Data aplikasi tidak ditemukan", http.StatusNotFound)
+		ac.RenderError(w, r, http.StatusNotFound, "Aplikasi tidak ditemukan")
 		return
 	}
 
@@ -74,7 +86,9 @@ func (ac *AdminController) DetailApplication(w http.ResponseWriter, r *http.Requ
 		query = ac.env.DB.Rebind(query)
 		err = ac.env.DB.Select(&roleNames, query, args...)
 		if err != nil {
-			log.Printf("ERROR: Gagal mengambil nama peran: %v", err)
+			ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+			log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
+			return
 		}
 	}
 
@@ -83,7 +97,9 @@ func (ac *AdminController) DetailApplication(w http.ResponseWriter, r *http.Requ
 		query = ac.env.DB.Rebind(query)
 		err = ac.env.DB.Select(&posNames, query, args...)
 		if err != nil {
-			log.Printf("ERROR: Gagal mengambil nama posisi: %v", err)
+			ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+			log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
+			return
 		}
 	}
 
@@ -100,19 +116,29 @@ func (ac *AdminController) DetailApplication(w http.ResponseWriter, r *http.Requ
 func (ac *AdminController) NewApplicationForm(w http.ResponseWriter, r *http.Request) {
 	roles, err := models.GetAllRoles(ac.env.DB)
 	if err != nil {
-		http.Error(w, "Gagal mengambil data peran", http.StatusInternalServerError)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
 	position, err := models.GetAllPositions(ac.env.DB)
 	if err != nil {
-		http.Error(w, "Gagal mengambil data peran", http.StatusInternalServerError)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
+		return
+	}
+
+	categories, err := models.GetAllCategories(ac.env.DB)
+	if err != nil {
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
 	data := map[string]interface{}{
 		"Roles":    roles,
 		"Position": position,
+		"Category": categories,
 	}
 
 	ac.views.RenderPage(w, r, "admin-app-form", data)
@@ -130,20 +156,20 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 	slug := r.FormValue("slug")
 	targetURL := r.FormValue("target_url")
 	iconURL := "/uploads/icons/default.png"
+	categoryID, _ := strconv.Atoi(r.FormValue("category_id"))
 
 	roleIDs := r.Form["role_ids"]
 	posIDs := r.Form["position_ids"]
 
 	if name == "" || slug == "" || targetURL == "" {
-		http.Error(w, "Nama, Slug, dan Target URL wajib diisi", http.StatusBadRequest)
+		ac.RenderError(w, r, http.StatusBadRequest, "Nama, Slug, dan Target URL harus diisi")
 		return
 	}
 
 	if !strings.HasPrefix(targetURL, "http://") && !strings.HasPrefix(targetURL, "https://") {
-		http.Error(w, "Target URL harus diawali dengan http:// atau https://", http.StatusBadRequest)
+		ac.RenderError(w, r, http.StatusBadRequest, "URL Tujuan harus diawali http:// atau https://")
 		return
 	}
-
 
 	file, header, err := r.FormFile("icon-file")
 	if err == nil {
@@ -155,7 +181,7 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 		}
 
 		if !allowed[ext] {
-			http.Error(w, "Format file icon tidak didukung", http.StatusBadRequest)
+			ac.RenderError(w, r, http.StatusBadRequest, "Format File harus .png, atau .jpeg, atau .svg")
 			return
 		}
 
@@ -168,37 +194,37 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 
 		// Buat folder jika belum ada
 		if err := os.MkdirAll(filepath.Dir(savePath), 0755); err != nil {
-			log.Println("ERROR: Gagal buat folder icons:", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+			log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 			return
 		}
 
 		out, err := os.Create(savePath)
 		if err != nil {
-			log.Println("ERROR: Gagal membuat file icon:", err)
-			http.Error(w, "Gagal menyimpan icon aplikasi", http.StatusInternalServerError)
+			ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+			log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 			return
 		}
 		defer out.Close()
 
 		if _, err := io.Copy(out, file); err != nil {
-			log.Println("ERROR: Gagal menulis file icon:", err)
-			http.Error(w, "Gagal menyimpan icon aplikasi", http.StatusInternalServerError)
+			ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+			log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 			return
 		}
 
 		iconURL = "/uploads/icons/" + filename
 	}
 
-	err = models.CreateApplication(ac.env.DB, name, description, slug, targetURL, iconURL, roleIDs, posIDs)
+	err = models.CreateApplication(ac.env.DB, name, description, slug, targetURL, iconURL, categoryID, roleIDs, posIDs)
 	if err != nil {
-		log.Printf("ERROR: Gagal menyimpan aplikasi baru: %v", err)
-		http.Error(w, "Gagal menyimpan data aplikasi ke database", http.StatusInternalServerError)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
 	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
-	session.AddFlash("Aplikasi baru berhasil ditambahkan!")
+	session.AddFlash("Aplikasi " + name + " berhasil ditambahkan!")
 	session.Save(r, w)
 
 	http.Redirect(w, r, "/admin/applications", http.StatusSeeOther)
@@ -211,20 +237,33 @@ func (ac *AdminController) EditApplicationForm(w http.ResponseWriter, r *http.Re
 	// Ambil data aplikasi yang akan diedit
 	app, currentRoleIDs, currentPosIDs, err := models.FindApplicationByID(ac.env.DB, id)
 	if err != nil {
-		http.Error(w, "Data aplikasi tidak ditemukan", http.StatusNotFound)
+		if err == sql.ErrNoRows {
+			ac.RenderError(w, r, http.StatusNotFound, "Aplikasi Tidak Ditemukan")
+			return
+		}
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
 	allRoles, err := models.GetAllRoles(ac.env.DB)
 	if err != nil {
-		log.Println("Error : ", err)
-		http.Error(w, "Gagal mengambil data peran", http.StatusInternalServerError)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
 	allPos, err := models.GetAllPositions(ac.env.DB)
 	if err != nil {
-		http.Error(w, "Gagal mengambil data posisi", http.StatusInternalServerError)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
+		return
+	}
+
+	categories, err := models.GetAllCategories(ac.env.DB)
+	if err != nil {
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
@@ -244,6 +283,7 @@ func (ac *AdminController) EditApplicationForm(w http.ResponseWriter, r *http.Re
 		"AllPositions":     allPos,
 		"CurrentRoles":     currentRolesMap,
 		"CurrentPositions": currentPosMap,
+		"Categories":       categories,
 	}
 
 	ac.views.RenderPage(w, r, "admin-app-edit", data)
@@ -251,76 +291,74 @@ func (ac *AdminController) EditApplicationForm(w http.ResponseWriter, r *http.Re
 
 // UpdateApplication memproses form edit aplikasi.
 func (ac *AdminController) UpdateApplication(w http.ResponseWriter, r *http.Request) {
-    id := mux.Vars(r)["id"]
+	id := mux.Vars(r)["id"]
 
-    if err := r.ParseMultipartForm(10 << 20); err != nil {
-        http.Error(w, "Form error atau file terlalu besar", http.StatusBadRequest)
-        return
-    }
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		ac.RenderError(w, r, http.StatusBadRequest, "File Terlalu Besar, maksimal 10 MB")
+		return
+	}
 
-    name := r.FormValue("name")
-    description := r.FormValue("description")
-    slug := r.FormValue("slug")
-    targetURL := r.FormValue("target_url")
-    iconURL := r.FormValue("icon_url") 
-    
-    roleIDs := r.Form["role_ids"]
-    posIDs := r.Form["position_ids"]
+	name := r.FormValue("name")
+	description := r.FormValue("description")
+	slug := r.FormValue("slug")
+	targetURL := r.FormValue("target_url")
+	iconURL := r.FormValue("icon_url")
+	categoryID, _ := strconv.Atoi(r.FormValue("category_id"))
 
-    if name == "" || slug == "" || targetURL == "" {
-        http.Error(w, "Semua field wajib diisi", http.StatusBadRequest)
-        return
-    }
+	roleIDs := r.Form["role_ids"]
+	posIDs := r.Form["position_ids"]
 
-    file, header, err := r.FormFile("icon-file")
-    if err == nil {
-        defer file.Close()
+	if name == "" || slug == "" || targetURL == "" {
+		ac.RenderError(w, r, http.StatusBadRequest, "Nama, Slug. dan Target URL Harus Diisi.")
+		return
+	}
 
+	file, header, err := r.FormFile("icon-file")
+	if err == nil {
+		defer file.Close()
 
-        ext := strings.ToLower(filepath.Ext(header.Filename))
-        allowed := map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".svg": true}
-        if !allowed[ext] {
-            http.Error(w, "Format file tidak didukung", http.StatusBadRequest)
-            return
-        }
+		ext := strings.ToLower(filepath.Ext(header.Filename))
+		allowed := map[string]bool{".png": true, ".jpg": true, ".jpeg": true, ".svg": true}
+		if !allowed[ext] {
+			ac.RenderError(w, r, http.StatusBadRequest, "Format File harus .png, atau .jpeg, atau .svg")
+			return
+		}
 
+		safeSlug := strings.ReplaceAll(slug, " ", "-")
+		filename := fmt.Sprintf("app-%s-icon%s", safeSlug, ext)
+		savePath := filepath.Join("public", "uploads", "icons", filename)
 
-        safeSlug := strings.ReplaceAll(slug, " ", "-")
-        filename := fmt.Sprintf("app-%s-icon%s", safeSlug, ext)
-        savePath := filepath.Join("public", "uploads", "icons", filename)
+		os.MkdirAll(filepath.Dir(savePath), 0755)
 
+		out, err := os.Create(savePath)
+		if err != nil {
+			ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+			log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
+			return
+		}
+		defer out.Close()
 
-        os.MkdirAll(filepath.Dir(savePath), 0755)
+		if _, err := io.Copy(out, file); err != nil {
+			ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+			log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
+			return
+		}
 
-        out, err := os.Create(savePath)
-        if err != nil {
-            log.Println("ERROR Create File:", err)
-            http.Error(w, "Gagal menyimpan file", http.StatusInternalServerError)
-            return
-        }
-        defer out.Close()
+		iconURL = "/uploads/icons/" + filename
+	}
 
-        if _, err := io.Copy(out, file); err != nil {
-            log.Println("ERROR Copy File:", err)
-            http.Error(w, "Gagal menulis file", http.StatusInternalServerError)
-            return
-        }
+	err = models.UpdateApplication(ac.env.DB, id, name, description, slug, targetURL, iconURL, categoryID, roleIDs, posIDs)
+	if err != nil {
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
+		return
+	}
 
-        iconURL = "/uploads/icons/" + filename
-    }
+	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
+	session.AddFlash("Aplikasi " + name + " berhasil diperbarui!")
+	session.Save(r, w)
 
-    err = models.UpdateApplication(ac.env.DB, id, name, description, slug, targetURL, iconURL, roleIDs, posIDs)
-    if err != nil {
-        log.Printf("ERROR: Gagal update aplikasi: %v", err)
-        http.Error(w, "Gagal memperbarui data aplikasi", http.StatusInternalServerError)
-        return
-    }
-
-    session, _ := ac.env.Store.Get(r, ac.env.SessionName)
-    session.AddFlash("Aplikasi berhasil diperbarui!")
-    session.Save(r, w)
-
-    http.Redirect(w, r, "/admin/applications", http.StatusSeeOther)
+	http.Redirect(w, r, "/admin/applications", http.StatusSeeOther)
 }
 
 // DeleteApplication menghapus aplikasi berdasarkan ID.
@@ -329,13 +367,17 @@ func (ac *AdminController) DeleteApplication(w http.ResponseWriter, r *http.Requ
 
 	err := models.DeleteApplication(ac.env.DB, id)
 	if err != nil {
-		log.Printf("ERROR: Gagal menghapus aplikasi: %v", err)
-		http.Error(w, "Gagal menghapus aplikasi", http.StatusInternalServerError)
+		if err == sql.ErrNoRows {
+			ac.RenderError(w, r, http.StatusNotFound, "Aplikasi Tidak Ditemukan.")
+			return
+		}
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 
 	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
-	session.AddFlash("Aplikasi berhasil dihapus!")
+	session.AddFlash("Aplikasi dengan id " + id + " berhasil dihapus!")
 	session.Save(r, w)
 
 	http.Redirect(w, r, "/admin/applications", http.StatusSeeOther)

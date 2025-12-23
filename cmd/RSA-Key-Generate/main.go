@@ -10,7 +10,6 @@ import (
 )
 
 func main() {
-	// Pastikan folder /keys sudah ada
 	if _, err := os.Stat("keys"); os.IsNotExist(err) {
 		err := os.Mkdir("keys", 0755)
 		if err != nil {
@@ -18,9 +17,9 @@ func main() {
 		}
 	}
 
-	fmt.Println("🔐 Menghasilkan RSA keypair...")
+	fmt.Println("Menghasilkan RSA keypair...")
 
-	// Generate RSA 2048-bit
+	// Generate RSA 2048-bit keypair
 	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
 		panic("Gagal generate private key: " + err.Error())
@@ -33,7 +32,6 @@ func main() {
 		Bytes: privBytes,
 	})
 
-	// Simpan private.pem
 	err = os.WriteFile("keys/private.pem", privPem, 0600)
 	if err != nil {
 		panic("Gagal menulis private.pem: " + err.Error())
@@ -46,13 +44,12 @@ func main() {
 		Bytes: pubBytes,
 	})
 
-	// Simpan public.pem
 	err = os.WriteFile("keys/public.pem", pubPem, 0644)
 	if err != nil {
 		panic("Gagal menulis public.pem: " + err.Error())
 	}
 
-	fmt.Println("✨ RSA Keypair berhasil dibuat di folder /keys")
+	fmt.Println("RSA Keypair berhasil dibuat di folder /keys")
 	fmt.Println("- keys/private.pem")
 	fmt.Println("- keys/public.pem")
 }

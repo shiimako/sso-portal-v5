@@ -1,78 +1,73 @@
 package admincontroller
 
 import (
-	"encoding/json"
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
-	"sso-portal-v3/models"
-	"sso-portal-v3/services"
-	"strings"
+	"sso-portal-v5/models"
+	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 func (ac *AdminController) ListPositions(w http.ResponseWriter, r *http.Request) {
-	data, err := models.GetAllPositions(ac.env.DB)
+	positions, err := models.GetAllPositions(ac.env.DB)
 	if err != nil {
-		http.Error(w, "Gagal mengambil data jabatan", 500)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
-	ac.views.RenderPage(w, r, "admin-positions-list", map[string]interface{}{"Data": data})
+	ac.views.RenderPage(w, r, "admin-positions-list", map[string]interface{}{"Positions": positions})
 }
 
-// StreamJabatanSync menangani SSE untuk Jabatan
-func (ac *AdminController) StreamPositionsSync(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Connection", "keep-alive")
+func (ac *AdminController) NewPositionForm(w http.ResponseWriter, r *http.Request) {
+	ac.views.RenderPage(w, r, "admin-positions-form", map[string]interface{}{"IsEdit": false})
+}
 
-	flusher, ok := w.(http.Flusher)
-	if !ok {
-		http.Error(w, "Streaming unsupported", 500)
+func (ac *AdminController) CreatePosition(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+
+	if err := models.CreatePosition(ac.env.DB, name); err != nil {
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
-
-	sendJSON := func(data map[string]interface{}) {
-		jsonMsg, _ := json.Marshal(data)
-		fmt.Fprintf(w, "data: %s\n\n", jsonMsg)
-		flusher.Flush()
-	}
-
-	models.CreateLog(ac.env.DB, "MANUAL", "JABATAN", "RUNNING", "Memulai sync Jabatan.")
-
-	serviceReporter := func(progress int, msg string) {
-		sendJSON(map[string]interface{}{"progress": progress, "log": msg, "status": "running"})
-	}
-
-	err := services.SyncPositions(ac.env, serviceReporter, "")
-
-	if err != nil {
-		models.CreateLog(ac.env.DB, "MANUAL", "JABATAN", "ERROR", err.Error())
-		sendJSON(map[string]interface{}{"status": "error", "message": err.Error(), "log": "❌ Gagal Sync."})
-	} else {
-		models.CreateLog(ac.env.DB, "MANUAL", "JABATAN", "SUCCESS", "Sinkronisasi Jabatan Berhasil.")
-		sendJSON(map[string]interface{}{"status": "done", "log": "✨ Selesai."})
-	}
+	http.Redirect(w, r, "/admin/positions", http.StatusFound)
 }
 
-func (ac *AdminController) RunPositionsCron() {
+func (ac *AdminController) EditPositionForm(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	pos, err := models.FindPositionByID(ac.env.DB, id)
+	if err != nil {
 
-	log.Println("⏰ [CRON] Memulai Sync Jabatan...")
-	models.CreateLog(ac.env.DB, "CRON", "JABATAN", "RUNNING", "Cron job jabatan berjalan otomatis.")
-
-	lastTime, _ := models.GetLastSuccessTime(ac.env.DB, "JABATAN")
-
-	cronReporter := func(progress int, msg string) {
-		if progress == 100 || strings.Contains(msg, "❌") {
-			log.Printf("[CRON JABATAN] %s", msg)
+		if err == sql.ErrNoRows{
+		ac.RenderError(w, r, http.StatusNotFound, "Data Posisi Tidak Ditemukan")
+		return
 		}
-	}
 
-	err := services.SyncPositions(ac.env, cronReporter, lastTime)
-	if err != nil {
-		log.Printf("❌ [CRON] Jabatan Gagal: %v", err)
-		models.CreateLog(ac.env.DB, "CRON", "JABATAN", "ERROR", err.Error())
-	} else {
-		log.Println("✅ [CRON] Jabatan Selesai.")
-		models.CreateLog(ac.env.DB, "CRON", "JABATAN", "SUCCESS", "Cron job role berhasil selesai.")
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
+		return
 	}
+	ac.views.RenderPage(w, r, "admin-positions-form", map[string]interface{}{
+		"Position": pos,
+		"IsEdit":   true,
+	})
+}
+
+func (ac *AdminController) UpdatePosition(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	name := r.FormValue("name")
+
+	if err := models.UpdatePosition(ac.env.DB, id, name); err != nil {
+		http.Error(w, "Gagal update jabatan: "+err.Error(), 500)
+		return
+	}
+	http.Redirect(w, r, "/admin/positions", http.StatusFound)
+}
+
+func (ac *AdminController) DeletePosition(w http.ResponseWriter, r *http.Request) {
+	id, _ := strconv.Atoi(mux.Vars(r)["id"])
+	models.DeletePosition(ac.env.DB, id)
+	http.Redirect(w, r, "/admin/positions", http.StatusFound)
 }

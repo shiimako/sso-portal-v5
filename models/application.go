@@ -16,49 +16,54 @@ type Application struct {
 	Slug        string         `db:"slug"`
 	TargetURL   string         `db:"target_url"`
 	IconURL     sql.NullString `db:"icon_url"`
+	CategoryID  int            `db:"category_id"` 
+    CategoryName string        `db:"category_name"`
 }
 
 // GetAllApplications mengambil semua data aplikasi dari database.
 func GetAllApplications(db *sqlx.DB, page int, pagesize int, search string) ([]Application, error) {
 	offset := (page - 1) * pagesize
 
-apps := []Application{}
+	apps := []Application{}
 
 	query := `
-		SELECT id, name, description, slug, target_url, icon_url
-		FROM applications
+		SELECT 
+            a.id, a.name, a.description, a.slug, a.target_url, a.icon_url, 
+            a.category_id, 
+            COALESCE(c.name, '-') as category_name
+		FROM applications a
+        LEFT JOIN categories c ON a.category_id = c.id
 		WHERE 1=1
 	`
 
 	params := []interface{}{}
 
 	if search != "" {
-		query += ` AND (name LIKE ? OR slug LIKE ? OR description LIKE ?) `
+		query += ` AND (a.name LIKE ? OR a.slug LIKE ? OR a.description LIKE ?) `
 		like := "%" + search + "%"
 		params = append(params, like, like, like)
 	}
 
-	query += ` ORDER BY id ASC LIMIT ? OFFSET ? `
+	query += ` ORDER BY a.id ASC LIMIT ? OFFSET ? `
 	params = append(params, pagesize, offset)
 
 	err := db.Select(&apps, query, params...)
 	if err != nil {
 		return nil, err
 	}
-
 	return apps, nil
 }
 
 // CreateApplication menyimpan aplikasi baru dan hak akses perannya dalam satu transaksi.
-func CreateApplication(db *sqlx.DB, name, description, slug, targetURL, iconURL string, roleIDs []string, positionIDs []string) error {
+func CreateApplication(db *sqlx.DB, name, description, slug, targetURL, iconURL string, categoryID int, roleIDs []string, positionIDs []string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	result, err := tx.Exec(`INSERT INTO applications (name, description, slug, target_url, icon_url) VALUES (?, ?, ?, ?, ?)`,
-		name, description, slug, targetURL, iconURL)
+	result, err := tx.Exec(`INSERT INTO applications (name, description, slug, target_url, icon_url, category_id) VALUES (?, ?, ?, ?, ?)`,
+		name, description, slug, targetURL, iconURL, categoryID)
 	if err != nil {
 		return err
 	}
@@ -106,8 +111,14 @@ func FindApplicationByID(db *sqlx.DB, id string) (Application, []int, []int, err
 	var roleIDs []int
 	var posIDs []int
 
-	queryApp := `SELECT id, name, description, slug, target_url, icon_url FROM applications WHERE id = ?`
-	err := db.QueryRow(queryApp, id).Scan(&app.ID, &app.Name, &app.Description, &app.Slug, &app.TargetURL, &app.IconURL)
+	queryApp := `SELECT 
+            a.id, a.name, a.description, a.slug, a.target_url, a.icon_url, 
+            a.category_id, 
+            COALESCE(c.name, '-') as category_name
+		FROM applications a
+        JOIN categories c ON a.category_id = c.id
+		WHERE a.id = ?`
+	err := db.QueryRow(queryApp, id).Scan(&app.ID, &app.Name, &app.Description, &app.Slug, &app.TargetURL, &app.IconURL, &app.CategoryID, &app.CategoryName)
 	if err != nil {
 		return app, nil, nil, err
 	}
@@ -146,15 +157,15 @@ func FindApplicationByID(db *sqlx.DB, id string) (Application, []int, []int, err
 }
 
 // UpdateApplication memperbarui data aplikasi dan hak akses perannya dalam satu transaksi.
-func UpdateApplication(db *sqlx.DB, id, name, description, slug, targetURL, iconURL string, roleIDs []string, posIDs []string) error {
+func UpdateApplication(db *sqlx.DB, id, name, description, slug, targetURL, iconURL string, categoryID int, roleIDs []string, posIDs []string) error {
 	tx, err := db.Begin()
 	if err != nil {
 		return err
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec(`UPDATE applications SET name=?, description =?, slug=?, target_url=?, icon_url =? WHERE id=?`,
-		name, description, slug, targetURL, iconURL, id)
+	_, err = tx.Exec(`UPDATE applications SET name=?, description =?, slug=?, target_url=?, icon_url =?, category_id =? WHERE id=?`,
+		name, description, slug, targetURL, iconURL, categoryID, id)
 	if err != nil {
 		return err
 	}
@@ -218,13 +229,13 @@ func DeleteApplication(db *sqlx.DB, id string) error {
 // FindApplicationBySlug mengambil satu aplikasi berdasarkan slug-nya.
 func FindApplicationBySlug(db *sqlx.DB, slug string) (Application, error) {
 	var app Application
-	query := `SELECT id, name, description, slug, target_url, icon_url FROM applications WHERE slug = ?`
+	query := `SELECT id, name, description, slug, target_url, icon_url, category_id FROM applications WHERE slug = ?`
 	err := db.Get(&app, query, slug)
 	return app, err
 }
 
 // FindAccessibleApps mengambil aplikasi yang dapat diakses berdasarkan role dan posisi.
-func FindAccessibleApps(db *sqlx.DB, roleName string, positionIDs []int) ([]Application, error) {
+func FindAccessibleApps(db *sqlx.DB, roleName string, positionIDs []int, categoryID int) ([]Application, error) {
     
 
     if len(positionIDs) == 0 {
@@ -237,7 +248,7 @@ func FindAccessibleApps(db *sqlx.DB, roleName string, positionIDs []int) ([]Appl
     FROM applications a
     JOIN application_role_access ara ON a.id = ara.application_id
     JOIN roles r ON ara.role_id = r.id
-    WHERE r.role_name = ?
+    WHERE r.role_name = ? AND a.category_id = ?
     
     UNION
 
@@ -245,10 +256,10 @@ func FindAccessibleApps(db *sqlx.DB, roleName string, positionIDs []int) ([]Appl
     SELECT a.id, a.name, a.description, a.slug, a.target_url, a.icon_url
     FROM applications a
     JOIN application_position_access apa ON a.id = apa.application_id
-    WHERE apa.position_id IN (?)
+    WHERE apa.position_id IN (?) AND a.category_id = ?
     `
 
-    query, args, err := sqlx.In(query, roleName, positionIDs)
+    query, args, err := sqlx.In(query, roleName, categoryID, positionIDs, categoryID)
     if err != nil {
         return nil, err
     }
