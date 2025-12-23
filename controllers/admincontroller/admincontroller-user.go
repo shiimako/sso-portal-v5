@@ -9,6 +9,7 @@ import (
 	"sso-portal-v5/models"
 	"strconv"
 
+	"github.com/go-sql-driver/mysql"
 	"github.com/gorilla/mux"
 )
 
@@ -43,12 +44,17 @@ func (ac *AdminController) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
+	flashes := session.Flashes()
+	session.Save(r, w)
+
 	pageData := map[string]interface{}{
-		"Users":        users,
-		"Page":         page,
-		"Limit":        limit,
-		"Search":       search,
-		"Role":         role,
+		"Users":  users,
+		"Page":   page,
+		"Limit":  limit,
+		"Search": search,
+		"Role":   role,
+		"Flash":  flashes,
 	}
 
 	ac.views.RenderPage(w, r, "admin-user-list", pageData)
@@ -164,20 +170,52 @@ func (ac *AdminController) CreateUser(w http.ResponseWriter, r *http.Request) {
 		NIP:      models.GetPtr(r.FormValue("nip")),
 		NUPTK:    models.GetPtr(r.FormValue("nuptk")),
 	}
-    if form.Status == "" { form.Status = "active" }
+	if form.Status == "" {
+		form.Status = "active"
+	}
+
+	if form.Name == "" || form.Email == "" || roleID == 0 {
+		ac.RenderError(w, r, http.StatusBadRequest, "Nama, Email, dan Role wajib diisi!")
+		return
+	}
+
+	if form.RoleName == "mahasiswa" {
+		if r.FormValue("nim") == "" {
+			ac.RenderError(w, r, http.StatusBadRequest, "NIM Wajib diisi untuk Mahasiswa!")
+			return
+		}
+	} else if form.RoleName == "dosen" {
+		if r.FormValue("nip") == "" || r.FormValue("nuptk") == "" {
+			ac.RenderError(w, r, http.StatusBadRequest, "Dosen wajib memiliki NIP atau NUPTK!")
+			return
+		}
+	}
 
 	positions, err := models.ParseLecturerPositions(r.FormValue("positions_json"))
 	if err != nil {
-		http.Error(w, "Format Jabatan Error", 400)
+		ac.RenderError(w, r, http.StatusBadRequest, "Parsing Position Error")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 	form.Positions = positions
 
 	_, err = models.CreateUser(ac.env.DB, form)
 	if err != nil {
-		ac.RenderError(w, r, http.StatusBadRequest, "Email sudah digunakan!!")
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok {
+			if mysqlErr.Number == 1062 {
+				ac.RenderError(w, r, http.StatusBadRequest, "Email sudah digunakan! Silahkan gunakan email lain.")
+				return
+			}
+		}
+
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
+
+	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
+	session.AddFlash("User " + form.Name + " berhasil ditambahkan!")
+	session.Save(r, w)
 
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
@@ -195,7 +233,6 @@ func (ac *AdminController) EditUserForm(w http.ResponseWriter, r *http.Request) 
 	majors, _ := models.GetAllMajors(ac.env.DB)
 	prodis, _ := models.GetAllStudyPrograms(ac.env.DB)
 
-
 	var existingPosJSON []models.PositionFormJSON
 	if user.Positions != nil {
 		for _, p := range user.Positions {
@@ -203,7 +240,7 @@ func (ac *AdminController) EditUserForm(w http.ResponseWriter, r *http.Request) 
 				PositionID: p.PositionID,
 				Scope:      "none",
 			}
-            
+
 			if p.StartDate != nil {
 				item.StartDate = *p.StartDate
 			}
@@ -222,7 +259,9 @@ func (ac *AdminController) EditUserForm(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 	posBytes, _ := json.Marshal(existingPosJSON)
-    if len(existingPosJSON) == 0 { posBytes = []byte("[]") }
+	if len(existingPosJSON) == 0 {
+		posBytes = []byte("[]")
+	}
 
 	ac.views.RenderPage(w, r, "admin-user-form", map[string]interface{}{
 		"IsEdit":           true,
@@ -257,18 +296,48 @@ func (ac *AdminController) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		NUPTK:    models.GetPtr(r.FormValue("nuptk")),
 	}
 
+	if form.Name == "" || form.Email == "" || roleID == 0 {
+		ac.RenderError(w, r, http.StatusBadRequest, "Nama, Email, dan Role wajib diisi!")
+		return
+	}
+
+	if form.RoleName == "mahasiswa" {
+		if r.FormValue("nim") == "" {
+			ac.RenderError(w, r, http.StatusBadRequest, "NIM Wajib diisi untuk Mahasiswa!")
+			return
+		}
+	} else if form.RoleName == "dosen" {
+		if r.FormValue("nip") == "" || r.FormValue("nuptk") == "" {
+			ac.RenderError(w, r, http.StatusBadRequest, "Dosen wajib memiliki NIP atau NUPTK!")
+			return
+		}
+	}
+
 	positions, err := models.ParseLecturerPositions(r.FormValue("positions_json"))
 	if err != nil {
-		http.Error(w, "Format Jabatan Error", 400)
+		ac.RenderError(w, r, http.StatusBadRequest, "Parsing Position Error")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
 	form.Positions = positions
 
 	err = models.UpdateUser(ac.env.DB, form)
 	if err != nil {
-		http.Error(w, "Gagal update: "+err.Error(), 500)
+		if mysqlErr, ok := err.(*mysql.MySQLError); ok {
+			if mysqlErr.Number == 1062 {
+				ac.RenderError(w, r, http.StatusBadRequest, "Email sudah digunakan! Silahkan gunakan email lain.")
+				return
+			}
+		}
+
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
+
+	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
+	session.AddFlash("User " + form.Name + " berhasil diubah!")
+	session.Save(r, w)
 
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }
@@ -277,12 +346,26 @@ func (ac *AdminController) DeleteUser(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, _ := strconv.Atoi(vars["id"])
 
+	loggedInUser := r.Context().Value("UserLogin").(*models.FullUser)
+    
+    if loggedInUser.ID == id {
+        session, _ := ac.env.Store.Get(r, ac.env.SessionName)
+        session.AddFlash("Anda tidak bisa menghapus akun Anda sendiri!")
+        session.Save(r, w)
+        http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
+        return
+    }
+
 	err := models.DeleteUser(ac.env.DB, id)
 	if err != nil {
-		fmt.Printf("Error Delete User: %v\n", err)
-		http.Error(w, "Gagal menghapus user", 500)
+		ac.RenderError(w, r, http.StatusInternalServerError, "Terjadi Kesalahan Pada Sistem, Silahkan Hubungi Administrator.")
+		log.Printf("CRITICAL ERROR path=%s, err=%v", r.URL.Path, err)
 		return
 	}
+
+	session, _ := ac.env.Store.Get(r, ac.env.SessionName)
+	session.AddFlash("User dengan ID " + vars["id"] + " berhasil dihapus!")
+	session.Save(r, w)
 
 	http.Redirect(w, r, "/admin/users", http.StatusSeeOther)
 }

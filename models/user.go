@@ -203,8 +203,8 @@ func GetAllUsers(db *sqlx.DB, page, pagesize int, search, role string) ([]UserLi
 	args := []interface{}{}
 
 	if search != "" {
-		query += " AND u.name LIKE ? "
-		args = append(args, "%"+search+"%")
+		query += " AND (u.name LIKE ? OR u.email LIKE ?) "
+		args = append(args, "%"+search+"%", "%"+search+"%")
 	}
 
 	if role != "" {
@@ -412,7 +412,7 @@ func DeleteUser(db *sqlx.DB, userID int) error {
 			tx.Rollback()
 		}
 	}()
-	_, err = tx.Exec(`UPDATE users SET deleted_at = NOW() WHERE id = ?`, userID)
+	_, err = tx.Exec(`DELETE FROM users WHERE id = ?`, userID)
 	if err != nil {
 		return err
 	}

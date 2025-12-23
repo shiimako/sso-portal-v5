@@ -48,7 +48,7 @@ func UpdateRole(db *sqlx.DB, id int, name, description string) error {
 }
 
 func DeleteRole(db *sqlx.DB, id int) error {
-	query := `UPDATE roles SET deleted_at = NOW() WHERE id = ?`
+	query := `DELETE FROM roles WHERE id = ?`
 	_, err := db.Exec(query, id)
 	return err
 }

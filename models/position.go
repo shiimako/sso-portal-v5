@@ -33,7 +33,7 @@ func UpdatePosition(db *sqlx.DB, id int, name string) error {
 }
 
 func DeletePosition(db *sqlx.DB, id int) error {
-	query := `UPDATE positions SET deleted_at = NOW() WHERE id = ?`
+	query := `DELETE FROM positions WHERE id = ?`
 	_, err := db.Exec(query, id)
 	return err
 }

@@ -185,11 +185,9 @@ func (ac *AdminController) CreateApplication(w http.ResponseWriter, r *http.Requ
 			return
 		}
 
-		// Buat filename aman: app_{slug}_icon.png
+		// Buat filename : app_{slug}_icon.png
 		safeSlug := strings.ReplaceAll(slug, " ", "-")
 		filename := fmt.Sprintf("app-%s-icon%s", safeSlug, ext)
-
-		// Path penyimpanan
 		savePath := filepath.Join("public", "uploads", "icons", filename)
 
 		// Buat folder jika belum ada

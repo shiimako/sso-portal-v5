@@ -4,6 +4,7 @@ package config
 
 import (
 	"log"
+	"net/http"
 	"os"
 
 	"github.com/gorilla/sessions"
@@ -21,6 +22,7 @@ func InitSessionStore() *sessions.CookieStore {
 		Path:     "/",
 		MaxAge:   86400 * 7,
 		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
 		// Secure: true, // Aktifkan ini saat sudah menggunakan HTTPS (production)
 	}
 

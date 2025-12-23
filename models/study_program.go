@@ -47,7 +47,7 @@ func UpdateStudyProgram(db *sqlx.DB, id int, name string, majorID int) error {
 }
 
 func DeleteStudyProgram(db *sqlx.DB, id int) error {
-	query := `UPDATE study_programs SET deleted_at = NOW() WHERE id = ?`
+	query := `DELETE FROM study_programs WHERE id = ?`
 	_, err := db.Exec(query, id)
 	return err
 }

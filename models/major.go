@@ -35,7 +35,7 @@ func UpdateMajor(db *sqlx.DB, id int, name string) error {
 }
 
 func DeleteMajor(db *sqlx.DB, id int) error {
-	query := `UPDATE majors SET deleted_at = NOW() WHERE id = ?`
+	query := `DELETE FROM majors WHERE id = ?`
 	_, err := db.Exec(query, id)
 	return err
 }

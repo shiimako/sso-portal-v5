@@ -16,9 +16,9 @@ import (
 )
 
 type WebhookPayload struct {
-	Event     string          `json:"event"`     // e.g., "user.updated", "jurusan.created"
-	Timestamp int64           `json:"timestamp"` // Waktu kejadian
-	Data      json.RawMessage `json:"data"`      // Data dinamis (bisa User, Jurusan, dll)
+	Event     string          `json:"event"`     
+	Timestamp int64           `json:"timestamp"`
+	Data      json.RawMessage `json:"data"`     
 }
 
 // HandleWebhook menerima push data 
@@ -79,7 +79,6 @@ func (ac *AdminController) HandleWebhook(w http.ResponseWriter, r *http.Request)
 		if err := json.Unmarshal(payload.Data, &notifData); err != nil {
 			processErr = fmt.Errorf("gagal decode notif: %v", err)
 		} else {
-			// Logic: Cari User & App -> Simpan Notif -> Kirim Push (WebSocket/FCM)
 			user, err := models.FindUserByEmail(ac.env.DB, notifData.Email)
 			if err != nil {
 				processErr = fmt.Errorf("user email tidak ditemukan: %s", notifData.Email)
@@ -104,15 +103,12 @@ func (ac *AdminController) HandleWebhook(w http.ResponseWriter, r *http.Request)
 		}
 
 	default:
-		// Jika ada event sync (user.updated, jurusan.created, dll) masuk, kita IGNORE saja.
-		// Return 200 OK supaya Data Center tidak menganggap error dan tidak mencoba mengirim ulang.
 		log.Printf("Webhook Ignored (Standalone Mode): %s", payload.Event)
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte("Event Ignored"))
 		return
 	}
 
-	// 6. Logging Hasil Proses
 	if processErr != nil {
 		fmt.Printf("❌ Webhook Error [%s]: %v\n", payload.Event, processErr)
 		http.Error(w, "Processing Failed", 500)

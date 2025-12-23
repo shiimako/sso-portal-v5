@@ -1771,3 +1771,31 @@ created by net/http.(*Server).Serve in goroutine 1
 2025/12/23 11:31:58 main.go:202: Server berjalan di http://localhost:8080
 2025/12/23 11:32:24 authcontroller.go:143: Akses ditolak, user tidak aktif: kayazmixf617.stu@pnc.ac.id
 2025/12/23 11:33:20 authcontroller.go:143: Akses ditolak, user tidak aktif: kayazmixf617.stu@pnc.ac.id
+2025/12/23 11:36:34 main.go:26: Logger berjalan :  2025-12-23 11:36:34.8818051 +0700 +07 m=+0.005556801
+2025/12/23 11:36:34 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 11:36:34 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 11:56:42 main.go:26: Logger berjalan :  2025-12-23 11:56:42.8985326 +0700 +07 m=+0.006728101
+2025/12/23 11:56:42 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 11:56:42 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 11:58:24 main.go:26: Logger berjalan :  2025-12-23 11:58:24.2260891 +0700 +07 m=+0.005569101
+2025/12/23 11:58:24 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 11:58:24 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 12:01:57 main.go:26: Logger berjalan :  2025-12-23 12:01:57.2041738 +0700 +07 m=+0.006406101
+2025/12/23 12:01:57 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 12:01:57 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 12:03:10 main.go:26: Logger berjalan :  2025-12-23 12:03:10.2474666 +0700 +07 m=+0.005694701
+2025/12/23 12:03:10 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 12:03:10 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 14:07:42 main.go:26: Logger berjalan :  2025-12-23 14:07:42.1960389 +0700 +07 m=+0.005115001
+2025/12/23 14:07:42 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 14:07:42 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 14:09:15 main.go:26: Logger berjalan :  2025-12-23 14:09:15.7121593 +0700 +07 m=+0.004864601
+2025/12/23 14:09:15 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 14:09:15 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 14:11:48 admin-controller-roles.go:43: CRITICAL ERROR path=/admin/role/create, err=Error 1062 (23000): Duplicate entry 'Coba 2' for key 'roles.name'
+2025/12/23 14:16:57 main.go:26: Logger berjalan :  2025-12-23 14:16:57.239921 +0700 +07 m=+0.004688801
+2025/12/23 14:16:57 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 14:16:57 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 15:09:51 main.go:26: Logger berjalan :  2025-12-23 15:09:51.2587556 +0700 +07 m=+0.005927401
+2025/12/23 15:09:51 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 15:09:51 main.go:202: Server berjalan di http://localhost:8080
