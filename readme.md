@@ -43,14 +43,42 @@ Pastikan sudah terinstall:
 - MySQL
 - Git
 
-### 2. Clone Repository
+### 2. Setup Google OAuth Credential
+
+Aplikasi ini menggunakan Google OAuth untuk autentikasi pengguna.
+
+Untuk mengaktifkan fitur ini, silakan lakukan langkah berikut:
+
+1. Buka Google Cloud Console  
+   https://console.cloud.google.com/
+
+2. Pilih atau buat project baru
+
+3. Aktifkan **Google Identity / OAuth Consent Screen**
+
+4. Pergi ke menu `**APIs & Services** > **Credentials**` untuk membuat credentials baru
+
+5. Buat OAuth Client ID:
+   - Application type: **Web Application**
+   - Authorized redirect URI:
+     ```
+     http://localhost:8080/auth/google/callback
+     ```
+     >sesuaikan kembali apabila base_url sistem mengalami perubahan.
+
+6. Simpan nilai berikut ke file `.env`:
+   ```env
+   GOOGLE_CLIENT_ID=your_client_id
+   GOOGLE_CLIENT_SECRET=your_client_secret
+
+### 3. Clone Repository
 
 ```bash
 git clone https://github.com/shiimako/sso-portal-v5.git
 cd sso-portal-v5
 ```
 
-### 3. Install Dependency
+### 4. Install Dependency
 
 Download semua library yang dibutuhkan:
 
@@ -58,7 +86,7 @@ Download semua library yang dibutuhkan:
 go mod tidy
 ```
 
-### 4. Konfigurasi Environment (.env)
+### 5. Konfigurasi Environment (.env)
 
 Copy file contoh `.env.example` menjadi `.env` :
 
@@ -68,7 +96,7 @@ cp .env.example .env
 
 Lalu edit file .env dan sesuaikan isinya.
 
-### 5. Setup Database
+### 6. Setup Database
 
 Karena menggunakan pendekatan Native SQL, silakan import file skema database secara manual:
 
@@ -79,7 +107,7 @@ Karena menggunakan pendekatan Native SQL, silakan import file skema database sec
    - [Download Seeder / Data Awal](database/seeder.sql)
    > ⚠️ Jika menggunakan seeder, Ganti email admin dengan email anda, pastikan email tersebut aktif.
 
-### 6. Generate Keys
+### 7. Generate Keys
 
 Jalankan seluruh generator dengan langkah berikut:
 
@@ -114,7 +142,7 @@ cd ..
 
 > ⚠️ Catatan: Proses generate key hanya perlu dijalankan satu kali.
 
-### 7. Jalankan Aplikasi
+### 8. Jalankan Aplikasi
 
 ```bash
 go run .
