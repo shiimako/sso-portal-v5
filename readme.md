@@ -64,7 +64,7 @@ Untuk mengaktifkan fitur ini, silakan lakukan langkah berikut:
      ```
      http://localhost:8080/auth/google/callback
      ```
-     >sesuaikan kembali apabila base_url sistem mengalami perubahan.
+     >⚠️ sesuaikan kembali redirect URI ini apabila base_url sistem mengalami perubahan.
 
 6. Simpan nilai berikut ke file `.env`:
    ```env
