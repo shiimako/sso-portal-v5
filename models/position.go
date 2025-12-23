@@ -9,7 +9,7 @@ type Position struct {
 
 func GetAllPositions(db *sqlx.DB) ([]Position, error) {
 	var data []Position
-	err := db.Select(&data, "SELECT id, position_name FROM positions ORDER BY position_name ASC")
+	err := db.Select(&data, "SELECT id, position_name FROM positions WHERE deleted_at IS NULL ORDER BY position_name ASC")
 	return data, err
 }
 

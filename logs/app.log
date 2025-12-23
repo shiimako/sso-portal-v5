@@ -1730,3 +1730,9 @@ created by net/http.(*Server).Serve in goroutine 1
 2025/12/23 08:34:56 main.go:26: Logger berjalan :  2025-12-23 08:34:56.5525583 +0700 +07 m=+0.004575301
 2025/12/23 08:34:56 database.go:33: Koneksi ke database  sso_providers  berhasil.
 2025/12/23 08:34:56 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 08:37:08 main.go:26: Logger berjalan :  2025-12-23 08:37:08.5163346 +0700 +07 m=+0.004216701
+2025/12/23 08:37:08 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 08:37:08 main.go:202: Server berjalan di http://localhost:8080
+2025/12/23 08:38:17 main.go:26: Logger berjalan :  2025-12-23 08:38:17.1925207 +0700 +07 m=+0.006330001
+2025/12/23 08:38:17 database.go:33: Koneksi ke database  sso_providers  berhasil.
+2025/12/23 08:38:17 main.go:202: Server berjalan di http://localhost:8080
