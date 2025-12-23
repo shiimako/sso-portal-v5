@@ -1,7 +1,8 @@
-# File: .gitignore
-
-# Abaikan file environment yang berisi rahasia
+# Secrets
 .env
-/keys/private.pem
-/keys/public.pem
-/logs/
+/keys/*.pem
+
+# Logs
+/logs/*.log
+
+

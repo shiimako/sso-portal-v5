@@ -56,7 +56,7 @@ Untuk mengaktifkan fitur ini, silakan lakukan langkah berikut:
 
 3. Aktifkan **Google Identity / OAuth Consent Screen**
 
-4. Pergi ke menu `**APIs & Services** > **Credentials**` untuk membuat credentials baru
+4. Pergi ke menu `APIs & Services > Credentials` untuk membuat credentials baru
 
 5. Buat OAuth Client ID:
    - Application type: **Web Application**
@@ -70,6 +70,7 @@ Untuk mengaktifkan fitur ini, silakan lakukan langkah berikut:
    ```env
    GOOGLE_CLIENT_ID=your_client_id
    GOOGLE_CLIENT_SECRET=your_client_secret
+   ```
 
 ### 3. Clone Repository
 
@@ -131,11 +132,23 @@ cd ..
 cd WebPush-Key-Generate
 go run main.go
 cd ..
+
+cd Webhook-Secret-Generate
+go run main.go
+cd ../..
 ```
 
 #### 3. Simpan hasil generate
 
 - Salin nilai key yang ditampilkan ke dalam file `.env`
+   ```env
+   SESSION_KEY="{{session key generated}}"
+   
+   WEBHOOK_SECRET= "{{webhook_secret generated}}"
+   
+   VAPID_PRIVATE_KEY="{{vapid_private_key generated}}"
+   VAPID_PUBLIC_KEY="{{vapid_public_key generated}}"
+   ```
 - Khusus RSA Key: file akan otomatis tergenerate sebagai:
   - `public.pem`
   - `private.pem`
