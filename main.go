@@ -186,7 +186,7 @@ func main() {
 	// CATEGORIES MANAGEMENT
 	// ====================================
 	adminRouter.HandleFunc("/categories", adminCtrl.ListCategories).Methods("GET")
-	adminRouter.HandleFunc("/categoriy/new", adminCtrl.NewCategoriesForm).Methods("GET")
+	adminRouter.HandleFunc("/category/new", adminCtrl.NewCategoriesForm).Methods("GET")
 	adminRouter.HandleFunc("/category/create", adminCtrl.CreateCategory).Methods("POST")
 	adminRouter.HandleFunc("/category/edit/{id}", adminCtrl.EditCategoriesForm).Methods("GET")
 	adminRouter.HandleFunc("/category/update/{id}", adminCtrl.UpdateCategory).Methods("POST")
