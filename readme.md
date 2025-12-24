@@ -122,7 +122,6 @@ cd cmd
 
 ```bash
 go run cmd/RSA-Key-Generate/main.go
-cd ..
 
 cd Session-Key-Generate
 go run main.go
