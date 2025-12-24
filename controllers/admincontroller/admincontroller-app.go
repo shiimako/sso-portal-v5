@@ -138,7 +138,7 @@ func (ac *AdminController) NewApplicationForm(w http.ResponseWriter, r *http.Req
 	data := map[string]interface{}{
 		"Roles":    roles,
 		"Position": position,
-		"Category": categories,
+		"Categories": categories,
 	}
 
 	ac.views.RenderPage(w, r, "admin-app-form", data)
