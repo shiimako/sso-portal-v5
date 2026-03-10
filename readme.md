@@ -121,9 +121,7 @@ cd cmd
 #### 2. Jalankan setiap generator key (satu per satu)
 
 ```bash
-cd RSA-Key-Generate
-go run main.go
-cd ..
+go run cmd/RSA-Key-Generate/main.go
 
 cd Session-Key-Generate
 go run main.go

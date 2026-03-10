@@ -62,7 +62,7 @@ func CreateApplication(db *sqlx.DB, name, description, slug, targetURL, iconURL 
 	}
 	defer tx.Rollback()
 
-	result, err := tx.Exec(`INSERT INTO applications (name, description, slug, target_url, icon_url, category_id) VALUES (?, ?, ?, ?, ?)`,
+	result, err := tx.Exec(`INSERT INTO applications (name, description, slug, target_url, icon_url, category_id) VALUES (?, ?, ?, ?, ?, ?)`,
 		name, description, slug, targetURL, iconURL, categoryID)
 	if err != nil {
 		return err
