@@ -96,7 +96,7 @@ func (ac *AdminController) HandleWebhook(w http.ResponseWriter, r *http.Request)
 						user.ID,
 						app.Name,
 						notifData.Message,
-						fmt.Sprintf("%s/redirect?app=%s", ac.env.BaseURL, notifData.AppSlug),
+						fmt.Sprintf("%s", ac.env.BaseURL),
 					)
 				}
 			}
